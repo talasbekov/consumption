@@ -1,0 +1,4 @@
+.data
+.venv
+grafana_data
+.ruff_cache
