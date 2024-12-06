@@ -7,9 +7,9 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
-from models import Department, Management, Division, Position, Rank, Status, Employer, State
+from models import Department, Management, Division, Position, Rank, Status, Employee, State
 from schemas import DepartmentCreate, ManagementCreate, DivisionCreate, PositionCreate, RankCreate, StatusCreate, \
-    EmployerRandomCreate, StateRandomCreate
+    EmployeeRandomCreate, StateRandomCreate
 from faker import Faker
 import random
 
@@ -164,39 +164,39 @@ class DataForService:
             print(f"Ошибка при создании статуса: {e}")
             return None
 
-    def create_employer(self, db: Session, employer_data: EmployerRandomCreate):
+    def create_employee(self, db: Session, employee_data: EmployeeRandomCreate):
         try:
             # Проверка на существование сотрудника с такими же данными
-            employer = db.query(Employer).filter_by(
-                surname=employer_data.surname,
-                firstname=employer_data.firstname,
-                patronymic=employer_data.patronymic,
-                sort=employer_data.sort,
-                rank_id=employer_data.rank_id,
-                division_id=employer_data.division_id,
-                status_id=employer_data.status_id
+            employee = db.query(Employee).filter_by(
+                surname=employee_data.surname,
+                firstname=employee_data.firstname,
+                patronymic=employee_data.patronymic,
+                sort=employee_data.sort,
+                rank_id=employee_data.rank_id,
+                division_id=employee_data.division_id,
+                status_id=employee_data.status_id
             ).first()
 
-            if employer:
+            if employee:
                 print(
-                    f"Сотрудник '{employer_data.firstname} {employer_data.surname}' уже существует. Используется существующий сотрудник.")
-                return employer
+                    f"Сотрудник '{employee_data.firstname} {employee_data.surname}' уже существует. Используется существующий сотрудник.")
+                return employee
 
             # Создание нового сотрудника, если не найден
-            employer = Employer(
-                surname=employer_data.surname,
-                firstname=employer_data.firstname,
-                patronymic=employer_data.patronymic,
-                sort=employer_data.sort,
-                rank_id=employer_data.rank_id,
-                division_id=employer_data.division_id,
-                status_id=employer_data.status_id
+            employee = Employee(
+                surname=employee_data.surname,
+                firstname=employee_data.firstname,
+                patronymic=employee_data.patronymic,
+                sort=employee_data.sort,
+                rank_id=employee_data.rank_id,
+                division_id=employee_data.division_id,
+                status_id=employee_data.status_id
             )
-            db.add(employer)
+            db.add(employee)
             db.commit()
-            db.refresh(employer)
-            print(f"Сотрудник '{employer_data.firstname} {employer_data.surname}' успешно создан.")
-            return employer
+            db.refresh(employee)
+            print(f"Сотрудник '{employee_data.firstname} {employee_data.surname}' успешно создан.")
+            return employee
         except Exception as e:
             db.rollback()
             print(f"Ошибка при создании сотрудника: {e}")
@@ -210,21 +210,21 @@ class DataForService:
                 management_id=state_data.management_id,
                 division_id=state_data.division_id,
                 position_id=state_data.position_id,
-                employer_id=state_data.employer_id
+                employee_id=state_data.employee_id
             ).first()
 
             if state:
                 print(
-                    f"Состояние для сотрудника с ID {state_data.employer_id} уже существует. Поиск другого employer_id.")
+                    f"Состояние для сотрудника с ID {state_data.employee_id} уже существует. Поиск другого employee_id.")
 
                 # Найти другого сотрудника, который еще не связан с данным состоянием
-                new_employer = db.query(Employer).filter(
-                    Employer.id != state_data.employer_id
+                new_employee = db.query(Employee).filter(
+                    Employee.id != state_data.employee_id
                 ).first()
 
-                if new_employer:
-                    print(f"Используется новый сотрудник с ID {new_employer.id} вместо {state_data.employer_id}.")
-                    state_data.employer_id = new_employer.id
+                if new_employee:
+                    print(f"Используется новый сотрудник с ID {new_employee.id} вместо {state_data.employee_id}.")
+                    state_data.employee_id = new_employee.id
                 else:
                     print("Другой сотрудник не найден, используется исходный сотрудник.")
                     return state  # Возвращаем найденное состояние, если нет других сотрудников
@@ -235,12 +235,12 @@ class DataForService:
                 management_id=state_data.management_id,
                 division_id=state_data.division_id,
                 position_id=state_data.position_id,
-                employer_id=state_data.employer_id
+                employee_id=state_data.employee_id
             )
             db.add(state)
             db.commit()
             db.refresh(state)
-            print(f"Состояние для сотрудника с ID {state_data.employer_id} успешно создано.")
+            print(f"Состояние для сотрудника с ID {state_data.employee_id} успешно создано.")
             return state
         except Exception as e:
             db.rollback()
@@ -337,7 +337,7 @@ class DataForService:
                 continue
 
 
-    def create_employers_for_state(self, db: Session):
+    def create_employees_for_state(self, db: Session):
         last_names = [
             "Жуманов", "Нурланов", "Ахметов", "Султанов", "Оспанов", "Есенгельдинов",
             "Ибраев", "Касымов", "Байжанов", "Тлеубаев", "Ержанов", "Арыстанов",
@@ -434,7 +434,7 @@ class DataForService:
 
         # Генерация данных для сотрудников
         for _ in range(150):
-            employer_data = EmployerRandomCreate(
+            employee_data = EmployeeRandomCreate(
                 surname=random.choice(last_names),
                 firstname=random.choice(first_names),
                 patronymic=random.choice(middle_names),
@@ -443,8 +443,8 @@ class DataForService:
                 division_id=random.choice(division_ids),
                 status_id=random.choice(status_ids)
             )
-            employer = self.create_employer(db, employer_data)
-            if not employer:
+            employee = self.create_employee(db, employee_data)
+            if not employee:
                 continue
 
         # Проверяем department
@@ -456,24 +456,24 @@ class DataForService:
             divisions = db.query(Division.id).filter(Division.management_id == management.id).all()
             management_divisions[management.id] = [division.id for division in divisions]
 
-        # Получаем все employer_ids из базы данных после создания записей
-        employer_ids = [employer.id for employer in db.query(Employer.id).all()]
+        # Получаем все employee_ids из базы данных после создания записей
+        employee_ids = [employee.id for employee in db.query(Employee.id).all()]
 
         # Создаем записи state, выбирая случайные значения для каждого поля
-        employer_index = 0  # Инициализация индекса
+        employee_index = 0  # Инициализация индекса
 
         for _ in range(130):  # Цикл точно на 130 итераций
             management_id = random.choice(list(management_divisions.keys()))
             division_id = random.choice(management_divisions[management_id])
             position_id = random.choice(position_ids)
 
-            # Берем employer_id по индексу и увеличиваем индекс
-            employer_id = employer_ids[employer_index]
-            employer_index += 1
+            # Берем employee_id по индексу и увеличиваем индекс
+            employee_id = employee_ids[employee_index]
+            employee_index += 1
 
             # Если индекс выходит за пределы списка, сбрасываем его на 0
-            if employer_index >= len(employer_ids):
-                employer_index = 0
+            if employee_index >= len(employee_ids):
+                employee_index = 0
 
             # Создаем данные для state
             state_data = StateRandomCreate(
@@ -481,7 +481,7 @@ class DataForService:
                 management_id=management_id,
                 division_id=division_id,
                 position_id=position_id,
-                employer_id=employer_id
+                employee_id=employee_id
             )
 
             # Создаем запись state
@@ -500,12 +500,12 @@ class DataForService:
             if photo_path.is_file() and photo_path.suffix in [".jpg", ".png"]:
                 try:
                     # Извлекаем id работодателя из названия файла
-                    employer_id = int(photo_path.stem.split('_')[0])  # Получаем всё, что до символа '_'
+                    employee_id = int(photo_path.stem.split('_')[0])  # Получаем всё, что до символа '_'
 
                     # Ищем работодателя по id
-                    employer = db.query(Employer).filter(Employer.id == employer_id).first()
-                    if not employer:
-                        print(f"Работодатель с id {employer_id} не найден")
+                    employee = db.query(Employee).filter(Employee.id == employee_id).first()
+                    if not employee:
+                        print(f"Работодатель с id {employee_id} не найден")
                         continue
 
                     # Используем aiofiles для асинхронного чтения файлов
@@ -520,15 +520,15 @@ class DataForService:
                         image = image.convert("RGB")
                     print(photo_path.name, "qazaq")
                     # Путь для сохранения изображения
-                    save_path = Path(f"media/images/employer_photos/{employer.id}_{employer.surname}.jpg")
+                    save_path = Path(f"media/images/employee_photos/{employee.id}_{employee.surname}.jpg")
                     save_path.parent.mkdir(parents=True, exist_ok=True)
 
                     # Сохраняем изображение (синхронно, т.к. PIL не поддерживает асинхронность)
                     image.save(save_path)
 
                     # Обновляем запись в БД
-                    employer.photo = str(save_path)
-                    db.add(employer)
+                    employee.photo = str(save_path)
+                    db.add(employee)
                 except ValueError:
                     print(f"Не удалось извлечь id работодателя из имени файла {photo_path.name}")
                     continue

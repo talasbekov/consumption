@@ -1,13 +1,13 @@
 from typing import Optional
 
-from schemas import Model, DepartmentStateRead, ManagementStateRead, DivisionStateRead, PositionStateRead, EmployerStateRead
+from schemas import Model, DepartmentStateRead, ManagementStateRead, DivisionStateRead, PositionStateRead, EmployeeStateRead
 
 class StateBase(Model):
     department_id: Optional[int]
     management_id: Optional[int]
     division_id: Optional[int]
     position_id: Optional[int]
-    employer_id: Optional[int]
+    employee_id: Optional[int]
 
     class Config:
         orm_mode = True
@@ -27,16 +27,16 @@ class StateRead(Model):
     managements: Optional[ManagementStateRead]
     divisions: Optional[DivisionStateRead]
     positions: Optional[PositionStateRead]
-    employers: Optional[EmployerStateRead]
+    employees: Optional[EmployeeStateRead]
 
     class Config:
         orm_mode = True
 
 
-class StateEmployerRead(Model):
+class StateEmployeeRead(Model):
     id: int
     positions: Optional[PositionStateRead]
-    employers: Optional[EmployerStateRead]
+    employees: Optional[EmployeeStateRead]
 
     class Config:
         orm_mode = True
@@ -47,7 +47,7 @@ class StateRandomCreate(Model):
     management_id: Optional[int]
     division_id: Optional[int]
     position_id: Optional[int]
-    employer_id: Optional[int]
+    employee_id: Optional[int]
 
 
 class StateTreeRead(Model):

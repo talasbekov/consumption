@@ -3,7 +3,7 @@ from typing import Optional, Text
 from schemas import Model, DivisionRead, RankRead, StatusRead
 
 
-class EmployerBase(Model):
+class EmployeeBase(Model):
     surname: Optional[str]
     firstname: Optional[str]
     patronymic: Optional[str]
@@ -18,22 +18,22 @@ class EmployerBase(Model):
         orm_mode = True
 
 
-class EmployerCreate(EmployerBase):
+class EmployeeCreate(EmployeeBase):
     pass
 
 
-class EmployerUpdate(EmployerBase):
+class EmployeeUpdate(EmployeeBase):
     pass
 
 
-class EmployerRead(EmployerBase, Model):
+class EmployeeRead(EmployeeBase, Model):
     id: int
     divisions: Optional[DivisionRead]
 
     class Config:
         orm_mode = True
 
-class EmployerStateRead(Model):
+class EmployeeStateRead(Model):
     id: int
     surname: Optional[str]
     firstname: Optional[str]
@@ -49,7 +49,7 @@ class EmployerStateRead(Model):
         orm_mode = True
 
 
-class EmployerRandomCreate(Model):
+class EmployeeRandomCreate(Model):
     surname: Optional[str]
     firstname: Optional[str]
     patronymic: Optional[str]
@@ -60,8 +60,8 @@ class EmployerRandomCreate(Model):
     division_id: Optional[int]
 
 
-class EmployerDataBulkUpdate(Model):
-    employer_id: Optional[int]
+class EmployeeDataBulkUpdate(Model):
+    employee_id: Optional[int]
     rank_id: Optional[int]
     sort: Optional[int]
     status_id: Optional[int]
@@ -71,6 +71,6 @@ class EmployerDataBulkUpdate(Model):
         orm_mode = True
 
 
-class EmployerPhotoBulkUpdate(Model):
-    employer_id: Optional[int]
+class EmployeePhotoBulkUpdate(Model):
+    employee_id: Optional[int]
     photo: Optional[str]

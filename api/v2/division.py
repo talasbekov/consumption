@@ -121,7 +121,7 @@ async def delete(
     dependencies=[Depends(HTTPBearer())],
     response_model=List[dict]
 )
-def get_employer_count_by_directorate(db: Session = Depends(get_db)):
+def get_employee_count_by_directorate(db: Session = Depends(get_db)):
     """
     Расход сотрудников всего департамента
     """

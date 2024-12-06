@@ -10,14 +10,9 @@ class User(NamedModel):
 
     email = Column(String(150), nullable=True, unique=True)
     password = Column(String(255), nullable=True)
-    workplace = Column(String(128))
-    iin = Column(Integer, unique=True)
-    phone_number = Column(String(20), nullable=True)
-    is_accreditator = Column(Boolean, default=False)
-    admin = Column(Boolean, default=False)
     last_signed_at = Column(TIMESTAMP(timezone=True), nullable=True)
     login_count = Column(Integer, default=0)
 
-    employer_id = Column(Integer, ForeignKey("employers.id"))
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=True, index=True)
 
-    employers = relationship("Employer", back_populates="users")
+    employees = relationship("Employee", back_populates="users")

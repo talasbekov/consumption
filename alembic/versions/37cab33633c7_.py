@@ -61,6 +61,27 @@ def upgrade() -> None:
             ),
         )
 
+    if not op.get_bind().dialect.has_table(op.get_bind(), "companies"):
+        # Создание таблицы departments
+        op.create_table(
+            'companies',
+            sa.Column('id', sa.Integer, primary_key=True),
+            sa.Column("name", sa.String(length=128), nullable=False),
+            sa.Column("namekz", sa.String(length=128), nullable=True),
+            sa.Column("nameen", sa.String(length=128), nullable=True),
+
+            sa.Column(
+                'created_at', sa.DateTime, nullable=False, server_default=sa.func.now()
+            ),
+            sa.Column(
+                'updated_at',
+                sa.DateTime,
+                nullable=False,
+                server_default=sa.func.now(),
+                onupdate=sa.func.now(),
+            ),
+        )
+
     if not op.get_bind().dialect.has_table(op.get_bind(), "departments"):
         # Создание таблицы departments
         op.create_table(
@@ -69,6 +90,7 @@ def upgrade() -> None:
             sa.Column("name", sa.String(length=128), nullable=False),
             sa.Column("namekz", sa.String(length=128), nullable=True),
             sa.Column("nameen", sa.String(length=128), nullable=True),
+            sa.Column('company_id', sa.Integer, sa.ForeignKey('companies.id', ondelete='CASCADE')),
 
             sa.Column(
                 'created_at', sa.DateTime, nullable=False, server_default=sa.func.now()
@@ -90,7 +112,8 @@ def upgrade() -> None:
             sa.Column("name", sa.String(length=128), nullable=False),
             sa.Column("namekz", sa.String(length=128), nullable=True),
             sa.Column("nameen", sa.String(length=128), nullable=True),
-            sa.Column('department_id', sa.Integer, sa.ForeignKey('departments.id')),
+            sa.Column('company_id', sa.Integer, sa.ForeignKey('companies.id', ondelete='CASCADE'), nullable=True, index=True),
+            sa.Column('department_id', sa.Integer, sa.ForeignKey('departments.id', ondelete='CASCADE'), nullable=True, index=True),
             sa.Column(
                 'created_at', sa.DateTime, nullable=False, server_default=sa.func.now()
             ),
@@ -107,11 +130,12 @@ def upgrade() -> None:
         # Создание таблицы divisions
         op.create_table(
             'divisions',
-            sa.Column('id', sa.Integer, primary_key=True),
+            sa.Column('id', sa.Integer, primary_key=True, index=True),
             sa.Column("name", sa.String(length=128), nullable=False),
             sa.Column("namekz", sa.String(length=128), nullable=True),
             sa.Column("nameen", sa.String(length=128), nullable=True),
-            sa.Column('management_id', sa.Integer, sa.ForeignKey('managements.id')),
+            sa.Column('department_id', sa.Integer, sa.ForeignKey('departments.id'), nullable=True, index=True),
+            sa.Column('management_id', sa.Integer, sa.ForeignKey('managements.id'), nullable=True, index=True),
             sa.Column(
                 'created_at', sa.DateTime, nullable=False, server_default=sa.func.now()
             ),
@@ -128,7 +152,7 @@ def upgrade() -> None:
         # Создание таблицы statuses
         op.create_table(
             'statuses',
-            sa.Column('id', sa.Integer, primary_key=True),
+            sa.Column('id', sa.Integer, primary_key=True, index=True),
             sa.Column("name", sa.String(length=128), nullable=False),
             sa.Column("namekz", sa.String(length=128), nullable=True),
             sa.Column("nameen", sa.String(length=128), nullable=True),
@@ -146,10 +170,10 @@ def upgrade() -> None:
             ),
         )
 
-    if not op.get_bind().dialect.has_table(op.get_bind(), "employers"):
-        # Создание таблицы employers
+    if not op.get_bind().dialect.has_table(op.get_bind(), "employees"):
+        # Создание таблицы employees
         op.create_table(
-            'employers',
+            'employees',
             sa.Column('id', sa.Integer, primary_key=True, index=True),
             sa.Column('surname', sa.String(length=128), nullable=False),
             sa.Column('firstname', sa.String(length=128), nullable=False),
@@ -159,7 +183,8 @@ def upgrade() -> None:
             sa.Column("note", sa.Text, nullable=True),
 
             sa.Column('rank_id', sa.Integer, sa.ForeignKey('ranks.id')),
-            sa.Column('division_id', sa.Integer, sa.ForeignKey('divisions.id')),
+            sa.Column('division_id', sa.Integer, sa.ForeignKey('divisions.id'), nullable=True, index=True),
+            sa.Column('management_id', sa.Integer, sa.ForeignKey('managements.id'), nullable=True, index=True),
             sa.Column('status_id', sa.Integer, sa.ForeignKey('statuses.id')),
             sa.Column(
                 'created_at', sa.DateTime, nullable=False, server_default=sa.func.now()
@@ -179,12 +204,38 @@ def upgrade() -> None:
             'states',
             sa.Column('id', sa.Integer, primary_key=True),
 
-            sa.Column('department_id', sa.Integer, sa.ForeignKey('departments.id')),
-            sa.Column('management_id', sa.Integer, sa.ForeignKey('managements.id')),
-            sa.Column('division_id', sa.Integer, sa.ForeignKey('divisions.id')),
-            sa.Column('position_id', sa.Integer, sa.ForeignKey('positions.id')),
-            sa.Column('employer_id', sa.Integer, sa.ForeignKey('employers.id'), nullable=True, unique=True),
-
+            sa.Column(
+                'department_id',
+                sa.Integer,
+                sa.ForeignKey('departments.id', ondelete='SET NULL'),
+                nullable=True
+            ),
+            sa.Column(
+                'management_id',
+                sa.Integer,
+                sa.ForeignKey('managements.id', ondelete='SET NULL'),
+                nullable=True
+            ),
+            sa.Column(
+                'division_id',
+                sa.Integer,
+                sa.ForeignKey('divisions.id', ondelete='SET NULL'),
+                nullable=True
+            ),
+            sa.Column(
+                'position_id',
+                sa.Integer,
+                sa.ForeignKey('positions.id'),
+                nullable=True
+            ),
+            sa.Column(
+                'employee_id',
+                sa.Integer,
+                sa.ForeignKey('employees.id', ondelete='SET NULL'),
+                nullable=True,
+                unique=True,
+                index=True
+            ),
             sa.Column(
                 'created_at', sa.DateTime, nullable=False, server_default=sa.func.now()
             ),
@@ -203,15 +254,12 @@ def upgrade() -> None:
             sa.Column("id", sa.Integer, primary_key=True, index=True),
             sa.Column("email", sa.String(length=150), nullable=True, unique=True),
             sa.Column("password", sa.String(length=255), nullable=True),
-            sa.Column("workplace", sa.String(length=128), nullable=True),
-            sa.Column("iin", sa.String(length=12), nullable=False, unique=True),
-            sa.Column("phone_number", sa.String(length=20), nullable=True),
-            sa.Column("last_signed_at", sa.TIMESTAMP(timezone=True), nullable=True),
-            sa.Column("login_count", sa.Integer, nullable=False, default=0),
             sa.Column("name", sa.String(length=128), nullable=False),
             sa.Column("namekz", sa.String(length=128), nullable=True),
             sa.Column("nameen", sa.String(length=128), nullable=True),
-            sa.Column("employer_id", sa.Integer(), sa.ForeignKey("employers.id"), nullable=True),
+            sa.Column("last_signed_at", sa.TIMESTAMP(timezone=True), nullable=True),
+            sa.Column("login_count", sa.Integer, nullable=False, default=0),
+            sa.Column("employee_id", sa.Integer(), sa.ForeignKey("employees.id"), nullable=True, index=True),
             sa.Column(
                 "created_at", sa.DateTime, nullable=False, server_default=sa.func.now()
             ),
@@ -230,13 +278,13 @@ def upgrade() -> None:
 def downgrade() -> None:
     # ### commands auto generated by Alembic - please adjust! ###
     op.drop_table("users")
-    op.drop_table("departments")
-    op.drop_table("managements")
+    op.drop_table("states")
+    op.drop_table("employees")
     op.drop_table("divisions")
+    op.drop_table("managements")
+    op.drop_table("departments")
     op.drop_table("positions")
     op.drop_table("ranks")
     op.drop_table("statuses")
-    op.drop_table("employers")
-    op.drop_table("states")
 
     # ### end Alembic commands ###

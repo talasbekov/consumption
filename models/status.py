@@ -10,4 +10,4 @@ class Status(NamedModel):
     start_date = Column(Date, nullable=True)
     end_date = Column(Date, nullable=True)
 
-    employers = relationship("Employer", back_populates="statuses")
+    employees = relationship("Employee", back_populates="statuses")

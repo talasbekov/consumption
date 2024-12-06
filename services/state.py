@@ -12,12 +12,12 @@ from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 from io import BytesIO
 
-from models import State, Employer, Status
+from models import State, Employee, Status
 from schemas import (
     StateCreate,
     StateUpdate,
 )  # Предполагается, что у вас есть схемы создания и обновления событий
-from schemas import EmployerDataBulkUpdate
+from schemas import EmployeeDataBulkUpdate
 from services import user_service
 
 from services.base import ServiceBase
@@ -25,50 +25,50 @@ from services.base import ServiceBase
 
 class StateService(ServiceBase[State, StateCreate, StateUpdate]):
 
-    def get_by_employer_id(self, db: Session, employer_id: int) -> Optional[State]:
-        return db.query(State).filter(State.employer_id == employer_id).first()
+    def get_by_employee_id(self, db: Session, employee_id: int) -> Optional[State]:
+        return db.query(State).filter(State.employee_id == employee_id).first()
 
-    async def update_employers_by_state(self, db: Session, employers_data: List[EmployerDataBulkUpdate]):
+    async def update_employees_by_state(self, db: Session, employees_data: List[EmployeeDataBulkUpdate]):
         try:
-            # Парсим данные в объекты EmployerBulkUpdate
-            employers_list = parse_obj_as(List[EmployerDataBulkUpdate], employers_data)
+            # Парсим данные в объекты EmployeeBulkUpdate
+            employees_list = parse_obj_as(List[EmployeeDataBulkUpdate], employees_data)
 
-            for employer_data in employers_list:
+            for employee_data in employees_list:
                 # Получаем запись работодателя по ID
-                employer = db.query(Employer).filter(Employer.id == employer_data.id).first()
-                if not employer:
-                    logging.error(f"Employer with ID {employer_data.id} not found")
+                employee = db.query(Employee).filter(Employee.id == employee_data.id).first()
+                if not employee:
+                    logging.error(f"Employee with ID {employee_data.id} not found")
                     continue
 
                 # Обновляем поля только если они заданы
-                if employer_data.sort is not None:
-                    employer.sort = employer_data.sort
-                if employer_data.rank_id is not None:
-                    employer.rank_id = employer_data.rank_id
-                if employer_data.status_id is not None:
-                    employer.status_id = employer_data.status_id
+                if employee_data.sort is not None:
+                    employee.sort = employee_data.sort
+                if employee_data.rank_id is not None:
+                    employee.rank_id = employee_data.rank_id
+                if employee_data.status_id is not None:
+                    employee.status_id = employee_data.status_id
 
                 # Добавляем работодателя в сессию
-                db.add(employer)
+                db.add(employee)
 
             # Коммитим все изменения за один раз
             db.commit()
-            logging.info("All employers updated successfully")
+            logging.info("All employees updated successfully")
 
         except Exception as e:
-            logging.error(f"Error while processing employers: {e}")
+            logging.error(f"Error while processing employees: {e}")
             db.rollback()
-            raise HTTPException(status_code=500, detail="An error occurred while updating employers")
+            raise HTTPException(status_code=500, detail="An error occurred while updating employees")
 
 
     def get_count_of_state(self, db: Session, user_id: int)-> dict[Any, int]:
         print(user_id)
         user = user_service.get_by_id(db, user_id)
-        print(user.employer_id)
+        print(user.employee_id)
         emps = []
         states = db.query(self.model).all()
         for state in states:
-            emps.append(state.employer_id)
+            emps.append(state.employee_id)
 
         # Инициализируем state как None и создаем итератор по emps
         state = None
@@ -76,8 +76,8 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
 
         # Используем цикл while для перебора emps
         while state is None and index < len(emps):
-            employer_id = emps[index]
-            state = db.query(self.model).filter(self.model.employer_id == employer_id).first()
+            employee_id = emps[index]
+            state = db.query(self.model).filter(self.model.employee_id == employee_id).first()
             index += 1
 
         # Теперь state содержит либо значение, либо остался None, если подходящего значения не нашлось
@@ -87,11 +87,10 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
             print("No valid state found")
 
         state_count = db.query(self.model).filter(self.model.department_id == state.department_id).count()
-        vacant_count = db.query(self.model).filter(self.model.employer_id.is_(None)).count()
-        print(state_count, vacant_count)
+        vacant_count = db.query(self.model).filter(self.model.employee_id.is_(None)).count()
         by_list_count = state_count - vacant_count
         inline_count = (
-            db.query(Employer)
+            db.query(Employee)
             .join(State)
             .join(Status)
             .filter(state.department_id == State.department_id)
@@ -99,86 +98,31 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
             .count()
         )
         by_status_count = by_list_count - inline_count
-        on_sick_leave_count = (
-            db.query(Employer)
-            .join(State)
-            .join(Status)
-            .filter(state.department_id == State.department_id)
-            .filter(Status.name == "на больничном")
-            .count()
-        )
-        on_leave = (
-            db.query(Employer)
-            .join(State)
-            .join(Status)
-            .filter(state.department_id == State.department_id)
-            .filter(Status.name == "в отпуске")
-            .count()
-        )
-        business_trip_count = (
-            db.query(Employer)
-            .join(State)
-            .join(Status)
-            .filter(state.department_id == State.department_id)
-            .filter(Status.name == "в командировке")
-            .count()
-        )
-        on_duty_count = (
-            db.query(Employer)
-            .join(State)
-            .join(Status)
-            .filter(state.department_id == State.department_id)
-            .filter(Status.name == "на дежурстве")
-            .count()
-        )
-        after_duty = (
-            db.query(Employer)
-            .join(State)
-            .join(Status)
-            .filter(state.department_id == State.department_id)
-            .filter(Status.name == "после дежурства")
-            .count()
-        )
-        on_studying_count = (
-            db.query(Employer)
-            .join(State)
-            .join(Status)
-            .filter(state.department_id == State.department_id)
-            .filter(Status.name == "на соревновании")
-            .count()
-        )
-        on_seconded = (
-            db.query(Employer)
-            .join(State)
-            .join(Status)
-            .filter(state.department_id == State.department_id)
-            .filter(Status.name == "прикомандирован")
-            .count()
-        )
-        out_seconded = (
-            db.query(Employer)
-            .join(State)
-            .join(Status)
-            .filter(state.department_id == State.department_id)
-            .filter(Status.name == "откомандирован")
-            .count()
-        )
 
-        return {
-            "state_count": state_count,
-            "vacant_count": vacant_count,
-            "by_list_count": by_list_count,
-            "inline_count": inline_count,
-            "by_status_count": by_status_count,
-            "on_sick_leave_count": on_sick_leave_count,
-            "on_leave": on_leave,
-            "business_trip_count": business_trip_count,
-            "on_duty_count": on_duty_count,
-            "after_duty": after_duty,
-            "on_studying_count": on_studying_count,
-            "on_seconded": on_seconded,
-            "out_seconded": out_seconded
+        # Формируем начальный словарь
+        result = {
+            "by state": {"count": state_count, "name": "по штату"},
+            "by vacant": {"count": vacant_count, "name": "ваканты"},
+            "by list": {"count": by_list_count, "name": "по списку"},
+            "by status": {"count": by_status_count, "name": "общее количество отсутствующих"},
         }
+
+        # Обрабатываем статусы
+        statuses = db.query(Status).all()
+        for status in statuses:
+            count = (
+                db.query(Employee)
+                .join(State)
+                .join(Status)
+                .filter(state.department_id == State.department_id)
+                .filter(Status.name == status.name)
+                .count()
+            )
+            # Добавляем данные по каждому статусу в словарь
+            result[status.nameEN] = {"count": count, "name": status.name}
+
+        # Возвращаем итоговый словарь
+        return result
 
     def create_word_report_from_template(self, db: Session, user_id: int):
         """

@@ -10,8 +10,8 @@ from sqlalchemy.orm import Session
 
 from core import get_db
 
-from schemas import StateRead, StateUpdate, StateCreate, EmployerDataBulkUpdate, EmployerStateRead
-from services import state_service, employer_service
+from schemas import StateRead, StateUpdate, StateCreate, EmployeeDataBulkUpdate, EmployeeStateRead
+from services import state_service, employee_service
 
 router = APIRouter(prefix="/states", tags=["States"], dependencies=[Depends(HTTPBearer())])
 
@@ -142,10 +142,10 @@ async def get_all_counts(
 @router.get(
     "/in/management",
     dependencies=[Depends(HTTPBearer())],
-    response_model=List[EmployerStateRead],
-    summary="Get all Employers by Management",
+    response_model=List[EmployeeStateRead],
+    summary="Get all Employees by Management",
 )
-async def get_employers_by_management(
+async def get_employees_by_management(
         *,
         db: Session = Depends(get_db),
         Authorize: AuthJWT = Depends()
@@ -155,79 +155,79 @@ async def get_employers_by_management(
     """
     Authorize.jwt_required()
     user_id = Authorize.get_jwt_subject()
-    return await employer_service.get_employers_by_management(db, user_id)
+    return await employee_service.get_employees_by_management(db, user_id)
 
 
 @router.post(
     "/in/management/upload/photo",
     dependencies=[Depends(HTTPBearer())],
-    summary="Upload photos for Employers",
+    summary="Upload photos for Employees",
 )
 async def upload_photo(
         *,
         db: Session = Depends(get_db),
         photos: List[UploadFile] = File(...),
-        employer_ids: str = Form(...),  # Ожидаем employer_ids как строку через Form
+        employee_ids: str = Form(...),  # Ожидаем employee_ids как строку через Form
         Authorize: AuthJWT = Depends()
 ):
     """
-    Upload photos for specific Employers
+    Upload photos for specific Employees
     """
     Authorize.jwt_required()
 
     # Логируем полученные данные для отладки
-    print(f"Received employer_ids (raw): {employer_ids}")
+    print(f"Received employee_ids (raw): {employee_ids}")
 
-    # Преобразуем строку employer_ids в список целых чисел
+    # Преобразуем строку employee_ids в список целых чисел
     try:
         # Разделяем строку по запятым и преобразуем каждое значение в int
-        employer_ids_list = [int(e_id.strip()) for e_id in employer_ids.split(",")]
+        employee_ids_list = [int(e_id.strip()) for e_id in employee_ids.split(",")]
 
         # Проверяем, пуст ли список
-        if not employer_ids_list:
-            raise ValueError("Employer IDs list is empty")
+        if not employee_ids_list:
+            raise ValueError("Employee IDs list is empty")
 
     except ValueError as e:
         # Логирование ошибки для отладки
-        print(f"Error converting employer_ids: {str(e)}")
-        raise HTTPException(status_code=422, detail="One or more employer_ids are not valid integers")
+        print(f"Error converting employee_ids: {str(e)}")
+        raise HTTPException(status_code=422, detail="One or more employee_ids are not valid integers")
 
     # Логирование для отладки
-    print(f"Processed employer_ids: {employer_ids_list}")
+    print(f"Processed employee_ids: {employee_ids_list}")
     print(f"Received {len(photos)} photos")
 
-    # Проверяем соответствие количества фотографий и employer_ids
-    if len(photos) != len(employer_ids_list):
-        raise HTTPException(status_code=400, detail="The number of employers and photos does not match")
+    # Проверяем соответствие количества фотографий и employee_ids
+    if len(photos) != len(employee_ids_list):
+        raise HTTPException(status_code=400, detail="The number of employees and photos does not match")
 
     # Передаем фотографии в сервис для обработки
-    return await employer_service.upload_only_photos(db, employer_ids_list, photos)
+    return await employee_service.upload_only_photos(db, employee_ids_list, photos)
 
 
 @router.post(
     "/in/management/upload/data",
     dependencies=[Depends(HTTPBearer())],
-    summary="Upload data for Employers",
+    summary="Upload data for Employees",
 )
 async def upload_data(
         *,
         db: Session = Depends(get_db),
-        employer_data: str = Form(...),  # Ожидаем данные как строку через Form
+        employee_data: str = Form(...),  # Ожидаем данные как строку через Form
         Authorize: AuthJWT = Depends()
 ):
     """
-    Upload data for all Employers in a management group
+    Upload data for all Employees in a management group
     """
     Authorize.jwt_required()
 
-    # Преобразуем строку employer_data в список объектов
+    # Преобразуем строку employee_data в список объектов
     try:
-        employer_data_list = parse_obj_as(List[EmployerDataBulkUpdate], json.loads(employer_data))
+        employee_data_list = parse_obj_as(List[EmployeeDataBulkUpdate], json.loads(employee_data))
     except json.JSONDecodeError:
-        raise HTTPException(status_code=422, detail="Invalid JSON format in employer_data")
+        raise HTTPException(status_code=422, detail="Invalid JSON format in employee_data")
 
     # Передаем данные в сервис для обновления работодателей
-    return await employer_service.upload_only_data(db, employer_data_list)
+    return await employee_service.upload_only_data(db, employee_data_list)
 
 
 # FastAPI эндпоинт для выгрузки документа

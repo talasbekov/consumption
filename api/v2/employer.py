@@ -7,17 +7,17 @@ from sqlalchemy.orm import Session
 
 from core import get_db
 
-from schemas import EmployerRead, EmployerUpdate, EmployerCreate
-from services import employer_service
+from schemas import EmployeeRead, EmployeeUpdate, EmployeeCreate
+from services import employee_service
 
-router = APIRouter(prefix="/employers", tags=["Employers"], dependencies=[Depends(HTTPBearer())])
+router = APIRouter(prefix="/employees", tags=["Employees"], dependencies=[Depends(HTTPBearer())])
 
 
 @router.get(
     "",
     dependencies=[Depends(HTTPBearer())],
-    response_model=List[EmployerRead],
-    summary="Get all Employers",
+    response_model=List[EmployeeRead],
+    summary="Get all Employees",
 )
 async def get_all(
     *,
@@ -26,39 +26,39 @@ async def get_all(
     limit: int = 200,
 ):
     """
-    Get all Employers
+    Get all Employees
 
     """
 
-    return employer_service.get_multi(db, skip, limit)
+    return employee_service.get_multi(db, skip, limit)
 
 
 @router.post(
     "",
     dependencies=[Depends(HTTPBearer())],
     status_code=status.HTTP_201_CREATED,
-    response_model=EmployerRead,
+    response_model=EmployeeRead,
     summary="Create Position",
 )
 async def create(
     *,
     db: Session = Depends(get_db),
-    body: EmployerCreate,
+    body: EmployeeCreate,
 ):
     """
-    Create Employer
+    Create Employee
 
     - **name**: required
     """
 
-    return employer_service.create(db, body)
+    return employee_service.create(db, body)
 
 
 @router.get(
     "/{id}/",
     dependencies=[Depends(HTTPBearer())],
-    response_model=EmployerRead,
-    summary="Get Employer by id",
+    response_model=EmployeeRead,
+    summary="Get Employee by id",
 )
 async def get_by_id(
     *,
@@ -66,33 +66,33 @@ async def get_by_id(
     id: str,
 ):
     """
-    Get Employer by id
+    Get Employee by id
 
     - **id**: UUID - required.
     """
 
-    return employer_service.get_by_id(db, str(id))
+    return employee_service.get_by_id(db, str(id))
 
 
 @router.put(
     "/{id}/",
     dependencies=[Depends(HTTPBearer())],
-    response_model=EmployerRead,
-    summary="Update Employer",
+    response_model=EmployeeRead,
+    summary="Update Employee",
 )
 async def update(
     *,
     db: Session = Depends(get_db),
     id: str,
-    body: EmployerUpdate,
+    body: EmployeeUpdate,
 ):
     """
-    Update Employer
+    Update Employee
 
     """
 
-    return employer_service.update(
-        db, db_obj=employer_service.get_by_id(db, str(id)), obj_in=body
+    return employee_service.update(
+        db, db_obj=employee_service.get_by_id(db, str(id)), obj_in=body
     )
 
 
@@ -100,7 +100,7 @@ async def update(
     "/{id}/",
     dependencies=[Depends(HTTPBearer())],
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete Employer",
+    summary="Delete Employee",
 )
 async def delete(
     *,
@@ -108,28 +108,28 @@ async def delete(
     id: str,
 ):
     """
-    Delete Employer
+    Delete Employee
 
     - **id**: UUId - required
     """
 
-    employer_service.remove(db, str(id))
+    employee_service.remove(db, str(id))
 
 
 @router.get(
     "",
     dependencies=[Depends(HTTPBearer())],
-    response_model=List[EmployerRead],
-    summary="Get all Employers",
+    response_model=List[EmployeeRead],
+    summary="Get all Employees",
 )
-async def get_all_emp_by_state(
+async def get_all_employee_by_state(
     *,
     db: Session = Depends(get_db),
     skip: int = 0,
     limit: int = 100,
 ):
     """
-    Get all Employers
+    Get all Employees
     """
 
-    return employer_service.get_multi(db, skip, limit)
+    return employee_service.get_multi(db, skip, limit)

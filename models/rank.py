@@ -9,4 +9,4 @@ class Rank(Model):
 
     name = Column(String(250))
 
-    employers = relationship("Employer", back_populates="ranks")
+    employees = relationship("Employee", back_populates="ranks")

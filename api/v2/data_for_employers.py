@@ -15,7 +15,7 @@ router = APIRouter(prefix="/random/datas", tags=["Datass"], dependencies=[Depend
 @router.post("/populate_all/", response_model=dict)
 def populate_all(db:Session = Depends(get_db)):
     try:
-        data_service.create_employers_for_state(db)
+        data_service.create_employees_for_state(db)
         return {"status": "Added records to all tables"}
     except Exception as e:
         logger.error(f"Error populating tables: {e}")

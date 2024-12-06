@@ -5,11 +5,11 @@ from .user import router as user2_router
 from .department import router as department_router
 from .management import router as management_router
 from .division import router as division_router
-from .employer import router as emp_router
+from .employee import router as emp_router
 from .state import router as state_router
 from .position import router as position_router
 from .rank import router as rank_router
-from .data_for_employers import router as data_router
+from .data_for_employees import router as data_router
 from .status import router as status_router
 
 
