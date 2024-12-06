@@ -10,8 +10,8 @@ class Management(NamedModel):
     company_id = Column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=True)
     department_id = Column(Integer, ForeignKey("departments.id", ondelete="CASCADE"), nullable=True)
 
-    companies = relationship("Company", back_populates="managements")
-    departments = relationship("Department", back_populates="managements")
-    divisions = relationship("Division", back_populates="managements")
-    employees = relationship("Employee", back_populates="managements")
+    company = relationship("Company", back_populates="managements")
+    department = relationship("Department", back_populates="managements")
+    divisions = relationship("Division", back_populates="management")
+    employees = relationship("Employee", back_populates="management")
     states = relationship("State", back_populates="managements")

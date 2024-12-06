@@ -13,7 +13,7 @@ class State(Model):
     position_id = Column(Integer, ForeignKey("positions.id"))
     employee_id = Column(Integer, ForeignKey("employees.id", ondelete="SET NULL"), nullable=True, unique=True)
 
-    departments = relationship("Department", back_populates="states", lazy="select")
+    department = relationship("Department", back_populates="states", lazy="select")
     managements = relationship("Management", back_populates="states", lazy="select")
     divisions = relationship("Division", back_populates="states", lazy="select")
     positions = relationship("Position", back_populates="states", lazy="select")

@@ -44,10 +44,6 @@ class AuthService:
         user_obj_in = UserCreate(
             email=EmailStr(form.email).lower(),
             name=form.name,
-            workplace=form.workplace,
-            phone_number=form.phone_number,
-            iin=form.iin,
-            admin=form.admin,
             password=hash_password(form.password),
         )
         print(user_obj_in, "user_obj_in")
@@ -76,8 +72,8 @@ class AuthService:
 
         # Определение дополнительных утверждений для токена
         user_claims = {
-            "role": str(user.workplace),
             "email": str(user.email),
+            "employee_id": str(user.employee_id) if user.employee_id else "",
         }
 
         # Создание токена доступа

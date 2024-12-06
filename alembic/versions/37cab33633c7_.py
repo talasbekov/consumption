@@ -283,6 +283,7 @@ def downgrade() -> None:
     op.drop_table("divisions")
     op.drop_table("managements")
     op.drop_table("departments")
+    op.drop_table("companies")
     op.drop_table("positions")
     op.drop_table("ranks")
     op.drop_table("statuses")

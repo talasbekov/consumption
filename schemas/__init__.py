@@ -6,6 +6,7 @@ from .position import PositionBase, PositionRead, PositionCreate, PositionUpdate
 from .division import DivisionBase, DivisionRead, DivisionCreate, DivisionUpdate, DivisionStateRead
 from .management import ManagementBase, ManagementRead, ManagementCreate, ManagementUpdate, ManagementStateRead
 from .department import DepartmentBase, DepartmentRead, DepartmentCreate, DepartmentUpdate, DepartmentStateRead
+from .company import CompanyRead, CompanyBase, CompanyCreate, CompanyUpdate
 from .status import StatusBase, StatusRead, StatusCreate, StatusUpdate
 from .employee import EmployeeBase, EmployeeRead, EmployeeCreate, EmployeeUpdate, EmployeeStateRead, EmployeeRandomCreate, EmployeePhotoBulkUpdate, EmployeeDataBulkUpdate
 from .state import StateBase, StateRead, StateCreate, StateUpdate, StateEmployeeRead, StateRandomCreate, StateTreeRead

@@ -18,8 +18,8 @@ class Employee(Model):
     management_id = Column(Integer, ForeignKey("managements.id"), nullable=True)
     status_id = Column(Integer, ForeignKey("statuses.id"))
 
-    managements = relationship("Management", back_populates="employees", lazy="select")
-    divisions = relationship("Division", back_populates="employees", lazy="select")
+    management = relationship("Management", back_populates="employees", lazy="select")
+    division = relationship("Division", back_populates="employees", lazy="select")
     states = relationship("State", back_populates="employees", lazy="joined")  # Используем lazy="joined", чтобы всегда делать JOIN
     ranks = relationship("Rank", back_populates="employees", lazy="select")
     statuses = relationship("Status", back_populates="employees", lazy="select")

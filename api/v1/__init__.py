@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from .auth import router as auth2_router
 from .user import router as user2_router
+from .company import router as company_router
 from .department import router as department_router
 from .management import router as management_router
 from .division import router as division_router
@@ -13,10 +14,11 @@ from .data_for_employees import router as data_router
 from .status import router as status_router
 
 
-router = APIRouter(prefix="/v2")
+router = APIRouter(prefix="/v1")
 
 router.include_router(auth2_router)
 router.include_router(user2_router)
+router.include_router(company_router)
 router.include_router(department_router)
 router.include_router(management_router)
 router.include_router(division_router)
