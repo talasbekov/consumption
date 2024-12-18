@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import List
 
 from fastapi import UploadFile, HTTPException
-from PIL import Image
+from PIL import Image, ImageOps
 from io import BytesIO
 
 from sqlalchemy.orm import Session, joinedload
@@ -46,8 +46,11 @@ class EmployeeService(ServiceBase[Employee, EmployeeCreate, EmployeeUpdate]):
             if image.mode == "RGBA":
                 image = image.convert("RGB")  # Преобразуем в RGB
 
+            # Обрезка изображения до соотношения сторон 3x4
+            image = self.crop_to_aspect_ratio(image, 3, 4)
+
             # Сохранение изображения
-            image.save(file_location)
+            image.save(file_location, format="JPEG", quality=85)
 
             # Обновляем путь к фотографии
             employee.photo = str(file_location)
@@ -62,6 +65,30 @@ class EmployeeService(ServiceBase[Employee, EmployeeCreate, EmployeeUpdate]):
             db.refresh(employee)
 
         return employees
+
+    def crop_to_aspect_ratio(self, image: Image.Image, target_width_ratio: int,
+                             target_height_ratio: int) -> Image.Image:
+        # Вычисление целевого соотношения сторон
+        target_ratio = target_width_ratio / target_height_ratio
+
+        # Определяем текущие размеры изображения
+        current_width, current_height = image.size
+        current_ratio = current_width / current_height
+
+        if current_ratio > target_ratio:
+            # Изображение слишком широкое, обрезаем по ширине
+            new_width = int(current_height * target_ratio)
+            left = (current_width - new_width) // 2
+            right = left + new_width
+            image = image.crop((left, 0, right, current_height))
+        else:
+            # Изображение слишком высокое, обрезаем по высоте
+            new_height = int(current_width / target_ratio)
+            top = (current_height - new_height) // 2
+            bottom = top + new_height
+            image = image.crop((0, top, current_width, bottom))
+
+        return ImageOps.fit(image, (target_width_ratio * 100, target_height_ratio * 100), Image.Resampling.LANCZOS)
 
     async def upload_only_data(
             self, db: Session, employee_data_list: List[EmployeeDataBulkUpdate]

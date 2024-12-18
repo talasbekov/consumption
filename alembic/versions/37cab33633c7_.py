@@ -156,6 +156,7 @@ def upgrade() -> None:
             sa.Column("name", sa.String(length=128), nullable=False),
             sa.Column("namekz", sa.String(length=128), nullable=True),
             sa.Column("nameen", sa.String(length=128), nullable=True),
+            sa.Column("note", sa.Text, nullable=True),
             sa.Column('start_date', sa.Date, nullable=True),
             sa.Column('end_date', sa.Date, nullable=True),
             sa.Column(

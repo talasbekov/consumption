@@ -1,5 +1,7 @@
 from typing import Optional, Text
 
+from pydantic import root_validator
+
 from schemas import Model, DivisionRead, RankRead, StatusRead
 
 
@@ -33,6 +35,7 @@ class EmployeeRead(EmployeeBase, Model):
     class Config:
         orm_mode = True
 
+
 class EmployeeStateRead(Model):
     id: int
     surname: Optional[str]
@@ -47,6 +50,14 @@ class EmployeeStateRead(Model):
 
     class Config:
         orm_mode = True
+
+    @root_validator(pre=True)
+    def clear_start_end_dates_if_active(cls, values):
+        statuses = values.get("statuses")
+        if statuses and statuses.name == "в строю":
+            statuses.start_date = None
+            statuses.end_date = None
+        return values
 
 
 class EmployeeRandomCreate(Model):
