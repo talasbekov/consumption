@@ -140,6 +140,26 @@ async def get_all_counts(
 
 
 @router.get(
+    "/management/count",
+    dependencies=[Depends(HTTPBearer())],
+    summary="Get all Management count",
+)
+async def get_count_of_management_state(
+    *,
+    db: Session = Depends(get_db),
+    Authorize: AuthJWT = Depends()
+):
+    """
+    Get all States
+
+    """
+    Authorize.jwt_required()
+    user_id = Authorize.get_jwt_subject()
+
+    return state_service.get_count_of_management_state(db, user_id)
+
+
+@router.get(
     "/in/management",
     dependencies=[Depends(HTTPBearer())],
     response_model=List[EmployeeStateRead],

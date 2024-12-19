@@ -12,7 +12,7 @@ from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 from io import BytesIO
 
-from models import State, Employee, Status
+from models import State, Employee, Status, Management
 from schemas import (
     StateCreate,
     StateUpdate,
@@ -122,6 +122,74 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
             result[status.nameEN] = {"count": count, "name": status.name}
 
         # Возвращаем итоговый словарь
+        return result
+
+    def get_count_of_management_state(self, db: Session, user_id: int) -> dict[str, dict[str, dict[str, int]]]:
+        # Получаем пользователя по user_id
+        user = user_service.get_by_id(db, user_id)
+        state = self.get_by_employee_id(db, user.employee_id)
+
+        if state is not None:
+            print("Found state:", state)
+        else:
+            print("No valid state found")
+
+        # Получаем общее количество из первой функции
+        overall_count = self.get_count_of_state(db, user_id)
+
+        # Инициализируем итоговый словарь
+        result = {"overall_count": overall_count}
+
+        # Добавляем общее количество в итоговый словарь
+
+        # Получаем все управления для текущего отдела
+        managements = db.query(Management).filter(Management.department_id == state.department_id).all()
+
+        for management in managements:
+            # Считаем количество по штату, вакантных сотрудников и т.д.
+            state_count = db.query(self.model).filter(self.model.department_id == management.department_id,
+                                                      self.model.management_id == management.id).count()
+            vacant_count = db.query(self.model).filter(self.model.employee_id.is_(None),
+                                                       self.model.department_id == management.department_id,
+                                                       self.model.management_id == management.id).count()
+            by_list_count = state_count - vacant_count
+            inline_count = (
+                db.query(Employee)
+                .join(State)
+                .join(Status)
+                .filter(State.department_id == management.department_id,
+                        State.management_id == management.id)
+                .filter(Status.name == "в строю")
+                .count()
+            )
+            by_status_count = by_list_count - inline_count
+
+            # Формируем структуру для управления
+            management_data = {
+                "by state": {"count": state_count, "name": "по штату"},
+                "by vacant": {"count": vacant_count, "name": "ваканты"},
+                "by list": {"count": by_list_count, "name": "по списку"},
+                "by status": {"count": by_status_count, "name": "общее количество отсутствующих"}
+            }
+
+            # Получаем данные по каждому статусу
+            statuses = db.query(Status).all()
+            for status in statuses:
+                count = (
+                    db.query(Employee)
+                    .join(State)
+                    .join(Status)
+                    .filter(State.department_id == management.department_id,
+                            State.management_id == management.id)
+                    .filter(Status.name == status.name)
+                    .count()
+                )
+                # Добавляем статус в словарь
+                management_data[status.nameEN] = {"count": count, "name": status.name}
+
+            # Добавляем информацию по каждому управлению в итоговый словарь
+            result[management.name] = management_data
+
         return result
 
     def create_word_report_from_template(self, db: Session, user_id: int):
