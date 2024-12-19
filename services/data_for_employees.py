@@ -13,6 +13,7 @@ from schemas import DepartmentCreate, ManagementCreate, DivisionCreate, Position
 from faker import Faker
 import random
 
+from services import employee_service
 
 fake = Faker()
 
@@ -519,6 +520,10 @@ class DataForService:
                     if image.mode == "RGBA":
                         image = image.convert("RGB")
                     print(photo_path.name, "qazaq")
+
+                    # Обрезка изображения до соотношения сторон 3x4
+                    image = employee_service.crop_to_aspect_ratio(image, 3, 4)
+
                     # Путь для сохранения изображения
                     save_path = Path(f"media/images/employee_photos/{employee.id}_{employee.surname}.jpg")
                     save_path.parent.mkdir(parents=True, exist_ok=True)
