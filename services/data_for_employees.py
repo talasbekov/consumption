@@ -337,7 +337,6 @@ class DataForService:
             if not status:
                 continue
 
-
     def create_employees_for_state(self, db: Session):
         last_names = [
             "Жуманов", "Нурланов", "Ахметов", "Султанов", "Оспанов", "Есенгельдинов",
