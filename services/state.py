@@ -1,5 +1,6 @@
 import logging
 import os
+from datetime import datetime
 from typing import Optional, Any, List
 from fastapi import HTTPException
 from pydantic.tools import parse_obj_as
@@ -138,9 +139,7 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
         overall_count = self.get_count_of_state(db, user_id)
 
         # Инициализируем итоговый словарь
-        result = {"overall_count": overall_count}
-
-        # Добавляем общее количество в итоговый словарь
+        result = {}
 
         # Получаем все управления для текущего отдела
         managements = db.query(Management).filter(Management.department_id == state.department_id).all()
@@ -188,16 +187,22 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
                 management_data[status.nameEN] = {"count": count, "name": status.name}
 
             # Добавляем информацию по каждому управлению в итоговый словарь
-            result[management.name] = management_data
+            result[management.nameKZ] = management_data
+
+        # Добавляем общее количество в итоговый словарь
+        result["Жалпы есеп"] = overall_count
 
         return result
 
     def create_word_report_from_template(self, db: Session, user_id: int):
         """
-        Создание отчета Word с подстановкой данных из функции get_count_of_state.
+        Создание отчета Word с подстановкой данных из функции get_count_of_state и get_count_of_management_state.
         """
-        # Получаем данные из функции get_count_of_state
-        data = self.get_count_of_state(db, user_id)
+        # Получаем данные из функции get_count_of_management_state
+        management_data = self.get_count_of_management_state(db, user_id)
+
+        # Получаем текущую дату в формате день.месяц.год
+        current_date = datetime.now().strftime("%d.%m.%Y")
 
         file_path = './template.docx'
         if not os.path.exists(file_path):
@@ -205,29 +210,49 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
 
         doc = Document(file_path)
 
-        # Заполнение таблицы значениями из data
-        for table in doc.tables:
-            row_idx = 4  # Индекс строки, с которой начинается заполнение
+        # Изменяем первый параграф (перед таблицей)
+        first_paragraph = doc.paragraphs[0]  # Получаем первый параграф документа
+        # Вставляем текст с датой
+        run = first_paragraph.add_run(f"ЖЕТІНШІ ДЕПАРТАМЕНТ ЖЕКЕ ҚҰРАМЫНЫҢ САПТЫҚ ТІЗІМІ {current_date} ЖЫЛҒЫ")
+        # Применяем стиль к тексту (Times New Roman, размер 12)
+        run.font.name = 'Times New Roman'
+        run.font.size = Pt(14)
+        run.bold = True  # Делаем текст жирным
+        # Настройка выравнивания по центру
+        first_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
+        # Поиск таблицы в документе
+        table = doc.tables[0]  # Предположим, что нужная таблица первая
+
+        # Заполнение таблицы данными по каждому управлению
+        row_idx = 2  # Строка для первого управления
+
+        # Получаем общее количество строк в таблице
+        total_rows = len(table.rows)
+
+        for management_name, management_info in management_data.items():
             row = table.rows[row_idx]
-            values = [
-                str(data.get("state_count", 0)),
-                str(data.get("by_list_count", 0)),
-                str(data.get("inline_count", 0)),
-                str(data.get("vacant_count", 0)),
-                str(data.get("on_leave", 0)),
-                str(data.get("business_trip_count", 0)),
-                str(data.get("on_sick_leave_count", 0)),
-                str(data.get("on_duty_count", 0)),
-                str(data.get("after_duty", 0)),
-                str(data.get("on_studying_count", 0)),
-                str(data.get("on_seconded", 0)),
-                str(data.get("out_seconded", 0))
+            row.cells[1].text = management_name  # Название управления
+
+            # Заполняем данные по каждому статусу для этого управления
+            management_values = [
+                str(management_info.get("by state", {}).get("count", 0)),
+                str(management_info.get("by list", {}).get("count", 0)),
+                str(management_info.get("by status", {}).get("count", 0)),
+                str(management_info.get("by vacant", {}).get("count", 0)),
+                str(management_info.get("on leave", {}).get("count", 0)),
+                str(management_info.get("on sick leave", {}).get("count", 0)),
+                str(management_info.get("business trip", {}).get("count", 0)),
+                str(management_info.get("on duty", {}).get("count", 0)),
+                str(management_info.get("after duty", {}).get("count", 0)),
+                str(management_info.get("on studying", {}).get("count", 0)),
+                str(management_info.get("on seconded", {}).get("count", 0)),
+                str(management_info.get("out seconded", {}).get("count", 0))
             ]
 
-            # Заполнение ячеек таблицы данными
-            for cell_idx, value in enumerate(values, start=2):
-                cell = row.cells[cell_idx]
+            # Заполнение значений в ячейки таблицы
+            for i, value in enumerate(management_values, start=2):  # Начинаем с ячейки 2
+                cell = row.cells[i]
                 cell.text = value
 
                 # Настройка выравнивания и стиля текста
@@ -241,8 +266,16 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
                 tc = cell._element
                 tcPr = tc.get_or_add_tcPr()
                 tcVAlign = OxmlElement('w:vAlign')
-                tcVAlign.set(qn('w:val'), 'bottom')
+                # Для выравнивания по обеим сторонам (center)
+                tcVAlign.set(qn('w:val'), 'center')
                 tcPr.append(tcVAlign)
+
+            # Сделать жирным последнюю строку
+            if row_idx == total_rows - 1:  # Если это последняя строка
+                for cell in row.cells:
+                    paragraph = cell.paragraphs[0]
+                    run = paragraph.runs[0]
+                    run.bold = True  # Делаем весь текст в строке жирным
 
             row_idx += 1
 
