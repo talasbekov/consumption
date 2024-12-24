@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, ForeignKey
+from sqlalchemy import Column, Integer, ForeignKey, Text
 from sqlalchemy.orm import relationship
 
 from models import NamedModel
@@ -6,6 +6,10 @@ from models import NamedModel
 
 class Department(NamedModel):
     __tablename__ = "departments"
+
+    titleRU = Column("titleru", Text, nullable=True)
+    titleKZ = Column("titlekz", Text, nullable=True)
+    titleEN = Column("titleen", Text, nullable=True)
 
     company_id = Column(Integer, ForeignKey("companies.id", ondelete="CASCADE"))
 

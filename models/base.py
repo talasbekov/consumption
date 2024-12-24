@@ -57,7 +57,7 @@ class Model(Base, Cloneable):
 class NamedModel(Model):
     __abstract__ = True
 
-    name = Column(String, nullable=False)
+    nameRU = Column("nameru", String, nullable=False)
     nameKZ = Column("namekz", String, nullable=True)
     nameEN = Column("nameen", String, nullable=True)
 

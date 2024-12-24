@@ -2,10 +2,10 @@ from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.dialects.postgresql import TIMESTAMP
 from sqlalchemy.orm import relationship
 
-from models import NamedModel
+from models import Model
 
 
-class User(NamedModel):
+class User(Model):
     __tablename__ = "users"
 
     email = Column(String(150), nullable=True, unique=True)

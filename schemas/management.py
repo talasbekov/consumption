@@ -1,9 +1,13 @@
 from typing import Optional, List
+from pydantic import Field
 
 from schemas import NamedModel, Model, DivisionRead
 
 
 class ManagementBase(NamedModel):
+    titleRU: Optional[str]
+    titleKZ: Optional[str]
+    titleEN: Optional[str]
     department_id: Optional[int]
 
     class Config:
@@ -20,8 +24,8 @@ class ManagementUpdate(ManagementBase):
 
 class ManagementRead(Model):
     id: Optional[int]
-    name: Optional[str]
-    divisions: List[DivisionRead] = []
+    nameRU: Optional[str]
+    divisions: List[DivisionRead] = Field(default_factory=list)
 
     class Config:
         orm_mode = True
@@ -29,7 +33,7 @@ class ManagementRead(Model):
 
 class ManagementStateRead(Model):
     id: int
-    name: Optional[str]
+    nameRU: Optional[str]
 
     class Config:
         orm_mode = True

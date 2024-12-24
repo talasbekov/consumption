@@ -3,6 +3,9 @@ from schemas import NamedModel, Model
 
 
 class DivisionBase(NamedModel):
+    titleRU: Optional[str]
+    titleKZ: Optional[str]
+    titleEN: Optional[str]
     management_id: Optional[int]
 
     class Config:
@@ -24,7 +27,7 @@ class DivisionRead(Model):
 
 class DivisionStateRead(Model):
     id: int
-    name: Optional[str]
+    nameRU: Optional[str]
 
     class Config:
         orm_mode = True

@@ -22,43 +22,43 @@ class DataForService:
 
     def create_department(self, db: Session, department_data: DepartmentCreate):
         # Попытка найти департамент с таким именем
-        department = db.query(Department).filter_by(name=department_data.name).first()
+        department = db.query(Department).filter_by(nameRU=department_data.nameRU).first()
 
         if department:
-            print(f"Департамент '{department_data.name}' уже существует. Используется существующий.")
+            print(f"Департамент '{department_data.nameRU}' уже существует. Используется существующий.")
             return department
 
         # Если департамент не найден, создаем новый
-        department = Department(name=department_data.name)
+        department = Department(nameRU=department_data.nameRU)
         db.add(department)
         db.commit()
         db.refresh(department)
-        print(f"Департамент '{department_data.name}' успешно создан.")
+        print(f"Департамент '{department_data.nameRU}' успешно создан.")
         return department
 
     def create_management(self, db: Session, management_data: ManagementCreate):
         try:
             # Проверка на существование управления с указанным именем и департаментом
             management = db.query(Management).filter_by(
-                name=management_data.name,
+                nameRU=management_data.nameRU,
                 department_id=management_data.department_id
             ).first()
 
             if management:
                 print(
-                    f"Управление '{management_data.name}' уже существует в департаменте с ID {management_data.department_id}. Используется существующее управление.")
+                    f"Управление '{management_data.nameRU}' уже существует в департаменте с ID {management_data.department_id}. Используется существующее управление.")
                 return management
 
             # Создание нового управления, если оно не найдено
             management = Management(
-                name=management_data.name,
+                nameRU=management_data.nameRU,
                 department_id=management_data.department_id
             )
             db.add(management)
             db.commit()
             db.refresh(management)
             print(
-                f"Управление '{management_data.name}' успешно создано в департаменте с ID {management_data.department_id}.")
+                f"Управление '{management_data.nameRU}' успешно создано в департаменте с ID {management_data.department_id}.")
             return management
         except Exception as e:
             db.rollback()
@@ -69,24 +69,24 @@ class DataForService:
         try:
             # Проверка на существование отдела с указанным именем и управлением
             division = db.query(Division).filter_by(
-                name=division_data.name,
+                nameRU=division_data.nameRU,
                 management_id=division_data.management_id
             ).first()
 
             if division:
                 print(
-                    f"Отдел '{division_data.name}' уже существует в управлении с ID {division_data.management_id}. Используется существующий отдел.")
+                    f"Отдел '{division_data.nameRU}' уже существует в управлении с ID {division_data.management_id}. Используется существующий отдел.")
                 return division
 
             # Создание нового отдела, если он не найден
             division = Division(
-                name=division_data.name,
+                nameRU=division_data.nameRU,
                 management_id=division_data.management_id
             )
             db.add(division)
             db.commit()
             db.refresh(division)
-            print(f"Отдел '{division_data.name}' успешно создан в управлении с ID {division_data.management_id}.")
+            print(f"Отдел '{division_data.nameRU}' успешно создан в управлении с ID {division_data.management_id}.")
             return division
         except Exception as e:
             db.rollback()
@@ -96,18 +96,18 @@ class DataForService:
     def create_position(self, db: Session, position_data: PositionCreate):
         try:
             # Проверка на существование позиции с таким же именем
-            position = db.query(Position).filter_by(name=position_data.name).first()
+            position = db.query(Position).filter_by(nameRU=position_data.nameRU).first()
 
             if position:
-                print(f"Позиция '{position_data.name}' уже существует. Используется существующая позиция.")
+                print(f"Позиция '{position_data.nameRU}' уже существует. Используется существующая позиция.")
                 return position
 
             # Создание новой позиции, если не найдена
-            position = Position(name=position_data.name)
+            position = Position(nameRU=position_data.nameRU)
             db.add(position)
             db.commit()
             db.refresh(position)
-            print(f"Позиция '{position_data.name}' успешно создана.")
+            print(f"Позиция '{position_data.nameRU}' успешно создана.")
             return position
         except Exception as e:
             db.rollback()
@@ -139,26 +139,26 @@ class DataForService:
         try:
             # Проверка на существование статуса с такими же параметрами
             status = db.query(Status).filter_by(
-                name=status_data.name,
+                nameRU=status_data.nameRU,
                 start_date=status_data.start_date,
                 end_date=status_data.end_date
             ).first()
 
             if status:
                 print(
-                    f"Статус '{status_data.name}' уже существует с указанными датами. Используется существующий статус.")
+                    f"Статус '{status_data.nameRU}' уже существует с указанными датами. Используется существующий статус.")
                 return status
 
             # Создание нового статуса, если не найден
             status = Status(
-                name=status_data.name,
+                nameRU=status_data.nameRU,
                 start_date=status_data.start_date,
                 end_date=status_data.end_date
             )
             db.add(status)
             db.commit()
             db.refresh(status)
-            print(f"Статус '{status_data.name}' успешно создан.")
+            print(f"Статус '{status_data.nameRU}' успешно создан.")
             return status
         except Exception as e:
             db.rollback()
@@ -175,7 +175,6 @@ class DataForService:
                 sort=employee_data.sort,
                 rank_id=employee_data.rank_id,
                 division_id=employee_data.division_id,
-                status_id=employee_data.status_id
             ).first()
 
             if employee:
@@ -191,7 +190,6 @@ class DataForService:
                 sort=employee_data.sort,
                 rank_id=employee_data.rank_id,
                 division_id=employee_data.division_id,
-                status_id=employee_data.status_id
             )
             db.add(employee)
             db.commit()
@@ -250,7 +248,7 @@ class DataForService:
 
     def populate_all_tables(self, db: Session):
         # Создание департамента
-        department_data = DepartmentCreate(name="Седьмой департамент")
+        department_data = DepartmentCreate(nameRU="Седьмой департамент")
         department = self.create_department(db, department_data)
 
         # Создание всех управлений и отделов
@@ -261,7 +259,7 @@ class DataForService:
         # Цикл для создания управлений
         for management_name in management_names:
             management_data = ManagementCreate(
-                name=management_name,
+                nameRU=management_name,
                 department_id=department.id
             )
             management = self.create_management(db, management_data)
@@ -271,7 +269,7 @@ class DataForService:
             # Цикл для создания отделов внутри каждого управления
             for division_name in division_names:
                 division_data = DivisionCreate(
-                    name=division_name,
+                    nameRU=division_name,
                     management_id=management.id
                 )
                 division = self.create_division(db, division_data)
@@ -290,7 +288,7 @@ class DataForService:
         ]
         for post in positions:
             # Создание должности
-            position_data = PositionCreate(name=post)
+            position_data = PositionCreate(nameRU=post)
             position = self.create_position(db, position_data)
             if not position:
                 continue
@@ -312,7 +310,7 @@ class DataForService:
             "откомандирован",
             "на дежурстве",
             "после дежурства",
-            "на соревновании",
+            "на учебе",
         ]
         for status in statuses:
             # Создание статуса с произвольной датой окончания
@@ -329,7 +327,7 @@ class DataForService:
 
 
             status_data = StatusCreate(
-                name=status,
+                nameRU=status,
                 start_date=start_date,
                 end_date=end_date
             )

@@ -20,7 +20,7 @@ class NamesModel(Model):
 
 
 class NamedModel(Model):
-    name: Optional[str]
+    nameRU: Optional[str]
     nameKZ: Optional[str]
     nameEN: Optional[str]
 

@@ -45,7 +45,7 @@ def upgrade() -> None:
         op.create_table(
             'positions',
             sa.Column('id', sa.Integer, primary_key=True),
-            sa.Column("name", sa.String(length=128), nullable=False),
+            sa.Column("nameru", sa.String(length=128), nullable=False),
             sa.Column("namekz", sa.String(length=128), nullable=True),
             sa.Column("nameen", sa.String(length=128), nullable=True),
 
@@ -66,7 +66,7 @@ def upgrade() -> None:
         op.create_table(
             'companies',
             sa.Column('id', sa.Integer, primary_key=True),
-            sa.Column("name", sa.String(length=128), nullable=False),
+            sa.Column("nameru", sa.String(length=128), nullable=False),
             sa.Column("namekz", sa.String(length=128), nullable=True),
             sa.Column("nameen", sa.String(length=128), nullable=True),
 
@@ -87,7 +87,10 @@ def upgrade() -> None:
         op.create_table(
             'departments',
             sa.Column('id', sa.Integer, primary_key=True),
-            sa.Column("name", sa.String(length=128), nullable=False),
+            sa.Column("titleru", sa.Text, nullable=True),
+            sa.Column("titlekz", sa.Text, nullable=True),
+            sa.Column("titleen", sa.Text, nullable=True),
+            sa.Column("nameru", sa.String(length=128), nullable=False),
             sa.Column("namekz", sa.String(length=128), nullable=True),
             sa.Column("nameen", sa.String(length=128), nullable=True),
             sa.Column('company_id', sa.Integer, sa.ForeignKey('companies.id', ondelete='CASCADE')),
@@ -109,7 +112,10 @@ def upgrade() -> None:
         op.create_table(
             'managements',
             sa.Column('id', sa.Integer, primary_key=True),
-            sa.Column("name", sa.String(length=128), nullable=False),
+            sa.Column("titleru", sa.Text, nullable=True),
+            sa.Column("titlekz", sa.Text, nullable=True),
+            sa.Column("titleen", sa.Text, nullable=True),
+            sa.Column("nameru", sa.String(length=128), nullable=False),
             sa.Column("namekz", sa.String(length=128), nullable=True),
             sa.Column("nameen", sa.String(length=128), nullable=True),
             sa.Column('company_id', sa.Integer, sa.ForeignKey('companies.id', ondelete='CASCADE'), nullable=True, index=True),
@@ -131,7 +137,10 @@ def upgrade() -> None:
         op.create_table(
             'divisions',
             sa.Column('id', sa.Integer, primary_key=True, index=True),
-            sa.Column("name", sa.String(length=128), nullable=False),
+            sa.Column("titleru", sa.Text, nullable=True),
+            sa.Column("titlekz", sa.Text, nullable=True),
+            sa.Column("titleen", sa.Text, nullable=True),
+            sa.Column("nameru", sa.String(length=128), nullable=False),
             sa.Column("namekz", sa.String(length=128), nullable=True),
             sa.Column("nameen", sa.String(length=128), nullable=True),
             sa.Column('department_id', sa.Integer, sa.ForeignKey('departments.id'), nullable=True, index=True),
@@ -153,7 +162,7 @@ def upgrade() -> None:
         op.create_table(
             'statuses',
             sa.Column('id', sa.Integer, primary_key=True, index=True),
-            sa.Column("name", sa.String(length=128), nullable=False),
+            sa.Column("nameru", sa.String(length=128), nullable=False),
             sa.Column("namekz", sa.String(length=128), nullable=True),
             sa.Column("nameen", sa.String(length=128), nullable=True),
             sa.Column("note", sa.Text, nullable=True),
@@ -196,6 +205,25 @@ def upgrade() -> None:
                 nullable=False,
                 server_default=sa.func.now(),
                 onupdate=sa.func.now(),
+            ),
+        )
+
+    if not op.get_bind().dialect.has_table(op.get_bind(), "status_employee_association"):
+        op.create_table(
+            "status_employees",
+            sa.Column(
+                "status_id",
+                sa.Integer,
+                sa.ForeignKey("statuses.id"),
+                primary_key=True,
+                nullable=False,
+            ),
+            sa.Column(
+                "employee_id",
+                sa.Integer,
+                sa.ForeignKey("employees.id"),
+                primary_key=True,
+                nullable=False,
             ),
         )
 
@@ -255,9 +283,6 @@ def upgrade() -> None:
             sa.Column("id", sa.Integer, primary_key=True, index=True),
             sa.Column("email", sa.String(length=150), nullable=True, unique=True),
             sa.Column("password", sa.String(length=255), nullable=True),
-            sa.Column("name", sa.String(length=128), nullable=False),
-            sa.Column("namekz", sa.String(length=128), nullable=True),
-            sa.Column("nameen", sa.String(length=128), nullable=True),
             sa.Column("last_signed_at", sa.TIMESTAMP(timezone=True), nullable=True),
             sa.Column("login_count", sa.Integer, nullable=False, default=0),
             sa.Column("employee_id", sa.Integer(), sa.ForeignKey("employees.id"), nullable=True, index=True),

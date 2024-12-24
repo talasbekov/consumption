@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import List
 
 from fastapi import APIRouter, Depends, status, UploadFile, File, Form, HTTPException, Response
@@ -230,15 +231,19 @@ async def upload_photo(
     summary="Upload data for Employees",
 )
 async def upload_data(
-        *,
-        db: Session = Depends(get_db),
-        employee_data: str = Form(...),  # Ожидаем данные как строку через Form
-        Authorize: AuthJWT = Depends()
+    *,
+    db: Session = Depends(get_db),
+    employee_data: str = Form(...),  # Ожидаем данные как строку через Form
+    Authorize: AuthJWT = Depends()
 ):
     """
     Upload data for all Employees in a management group
     """
     Authorize.jwt_required()
+
+    # Логирование пользователя
+    current_user = Authorize.get_jwt_subject()
+    logging.info(f"User {current_user} is uploading employee data")
 
     # Преобразуем строку employee_data в список объектов
     try:
@@ -246,8 +251,17 @@ async def upload_data(
     except json.JSONDecodeError:
         raise HTTPException(status_code=422, detail="Invalid JSON format in employee_data")
 
-    # Передаем данные в сервис для обновления работодателей
-    return await employee_service.upload_only_data(db, employee_data_list)
+    # Передаем данные в сервис для обновления сотрудников
+    try:
+        await employee_service.update_employees_by_state(db, employee_data_list)
+        return {"message": "Employees updated successfully"}
+    except HTTPException as e:
+        logging.error(f"Error updating employees: {e.detail}")
+        raise
+    except Exception as e:
+        logging.error(f"Unexpected error: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
+
 
 
 # FastAPI эндпоинт для выгрузки документа

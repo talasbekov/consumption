@@ -2,7 +2,7 @@ from typing import Optional, Text
 
 from pydantic import root_validator
 
-from schemas import Model, DivisionRead, RankRead, StatusRead
+from schemas import Model, DivisionRead, RankRead, StatusRead, StatusCreate
 
 
 class EmployeeBase(Model):
@@ -10,7 +10,6 @@ class EmployeeBase(Model):
     firstname: Optional[str]
     patronymic: Optional[str]
     sort: Optional[int]
-    status_id: Optional[int]
     rank_id: Optional[int]
     photo: Optional[str]
     division_id: Optional[int]
@@ -67,7 +66,6 @@ class EmployeeRandomCreate(Model):
     sort: Optional[int]
     rank_id: Optional[int]
     position_id: Optional[int]
-    status_id: Optional[int]
     division_id: Optional[int]
 
 
@@ -75,7 +73,7 @@ class EmployeeDataBulkUpdate(Model):
     employee_id: Optional[int]
     rank_id: Optional[int]
     sort: Optional[int]
-    status_id: Optional[int]
+    statuses: Optional[StatusCreate]
     note: Optional[Text]
 
     class Config:

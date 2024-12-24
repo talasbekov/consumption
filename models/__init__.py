@@ -4,6 +4,7 @@ from .position import Position
 from .division import Division
 from .management import Management
 from .department import Department
+from .association import status_employee_association
 from .company import Company
 from .employee import Employee
 from .state import State

@@ -29,16 +29,48 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
     def get_by_employee_id(self, db: Session, employee_id: int) -> Optional[State]:
         return db.query(State).filter(State.employee_id == employee_id).first()
 
+    # async def update_employees_by_state(self, db: Session, employees_data: List[EmployeeDataBulkUpdate]):
+    #     try:
+    #         # Парсим данные в объекты EmployeeBulkUpdate
+    #         employees_list = parse_obj_as(List[EmployeeDataBulkUpdate], employees_data)
+    #
+    #         for employee_data in employees_list:
+    #             # Получаем запись работодателя по ID
+    #             employee = db.query(Employee).filter(Employee.id == employee_data.id).first()
+    #             if not employee:
+    #                 logging.error(f"Employee with ID {employee_data.id} not found")
+    #                 continue
+    #
+    #             # Обновляем поля только если они заданы
+    #             if employee_data.sort is not None:
+    #                 employee.sort = employee_data.sort
+    #             if employee_data.rank_id is not None:
+    #                 employee.rank_id = employee_data.rank_id
+    #             if employee_data.status_id is not None:
+    #                 employee.status_id = employee_data.status_id
+    #
+    #             # Добавляем работодателя в сессию
+    #             db.add(employee)
+    #
+    #         # Коммитим все изменения за один раз
+    #         db.commit()
+    #         logging.info("All employees updated successfully")
+    #
+    #     except Exception as e:
+    #         logging.error(f"Error while processing employees: {e}")
+    #         db.rollback()
+    #         raise HTTPException(status_code=500, detail="An error occurred while updating employees")
+
     async def update_employees_by_state(self, db: Session, employees_data: List[EmployeeDataBulkUpdate]):
         try:
             # Парсим данные в объекты EmployeeBulkUpdate
             employees_list = parse_obj_as(List[EmployeeDataBulkUpdate], employees_data)
 
             for employee_data in employees_list:
-                # Получаем запись работодателя по ID
-                employee = db.query(Employee).filter(Employee.id == employee_data.id).first()
+                # Получаем запись сотрудника по ID
+                employee = db.query(Employee).filter(Employee.id == employee_data.employee_id).first()
                 if not employee:
-                    logging.error(f"Employee with ID {employee_data.id} not found")
+                    logging.error(f"Employee with ID {employee_data.employee_id} not found")
                     continue
 
                 # Обновляем поля только если они заданы
@@ -46,11 +78,18 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
                     employee.sort = employee_data.sort
                 if employee_data.rank_id is not None:
                     employee.rank_id = employee_data.rank_id
-                if employee_data.status_id is not None:
-                    employee.status_id = employee_data.status_id
 
-                # Добавляем работодателя в сессию
-                db.add(employee)
+                # Обновление статусов, если они переданы
+                if employee_data.statuses:
+                    # Очищаем старые статусы или добавляем новые
+                    new_status = Status(
+                        start_date=employee_data.statuses.start_date,
+                        end_date=employee_data.statuses.end_date,
+                        note=employee_data.statuses.note,
+                    )
+                    employee.statuses.append(new_status)
+
+                logging.info(f"Employee with ID {employee_data.employee_id} updated successfully")
 
             # Коммитим все изменения за один раз
             db.commit()
@@ -60,7 +99,6 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
             logging.error(f"Error while processing employees: {e}")
             db.rollback()
             raise HTTPException(status_code=500, detail="An error occurred while updating employees")
-
 
     def get_count_of_state(self, db: Session, user_id: int)-> dict[Any, int]:
         print(user_id)
@@ -95,7 +133,7 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
             .join(State)
             .join(Status)
             .filter(state.department_id == State.department_id)
-            .filter(Status.name == "в строю")
+            .filter(Status.nameRU == "в строю")
             .count()
         )
         by_status_count = by_list_count - inline_count
@@ -103,8 +141,8 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
         # Формируем начальный словарь
         result = {
             "by state": {"count": state_count, "name": "по штату"},
-            "by vacant": {"count": vacant_count, "name": "ваканты"},
             "by list": {"count": by_list_count, "name": "по списку"},
+            "by vacant": {"count": vacant_count, "name": "ваканты"},
             "by status": {"count": by_status_count, "name": "общее количество отсутствующих"},
         }
 
@@ -116,11 +154,11 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
                 .join(State)
                 .join(Status)
                 .filter(state.department_id == State.department_id)
-                .filter(Status.name == status.name)
+                .filter(Status.nameRU == status.nameRU)
                 .count()
             )
             # Добавляем данные по каждому статусу в словарь
-            result[status.nameEN] = {"count": count, "name": status.name}
+            result[status.nameEN] = {"count": count, "name": status.nameRU}
 
         # Возвращаем итоговый словарь
         return result
@@ -152,23 +190,23 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
                                                        self.model.department_id == management.department_id,
                                                        self.model.management_id == management.id).count()
             by_list_count = state_count - vacant_count
-            inline_count = (
-                db.query(Employee)
-                .join(State)
-                .join(Status)
-                .filter(State.department_id == management.department_id,
-                        State.management_id == management.id)
-                .filter(Status.name == "в строю")
-                .count()
-            )
-            by_status_count = by_list_count - inline_count
+            # inline_count = (
+            #     db.query(Employee)
+            #     .join(State)
+            #     .join(Status)
+            #     .filter(State.department_id == management.department_id,
+            #             State.management_id == management.id)
+            #     .filter(Status.nameRU == "в строю")
+            #     .count()
+            # )
+            # by_status_count = by_list_count - inline_count
 
             # Формируем структуру для управления
             management_data = {
                 "by state": {"count": state_count, "name": "по штату"},
-                "by vacant": {"count": vacant_count, "name": "ваканты"},
                 "by list": {"count": by_list_count, "name": "по списку"},
-                "by status": {"count": by_status_count, "name": "общее количество отсутствующих"}
+                "by vacant": {"count": vacant_count, "name": "ваканты"},
+                # "by status": {"count": by_status_count, "name": "общее количество отсутствующих"}
             }
 
             # Получаем данные по каждому статусу
@@ -180,12 +218,32 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
                     .join(Status)
                     .filter(State.department_id == management.department_id,
                             State.management_id == management.id)
-                    .filter(Status.name == status.name)
+                    .filter(Status.nameRU == status.nameRU)
                     .count()
                 )
                 # Добавляем статус в словарь
-                management_data[status.nameEN] = {"count": count, "name": status.name}
+                management_data[status.nameEN] = {"count": count, "name": status.nameRU}
 
+                status_list = (
+                    db.query(Employee)
+                    .join(State)
+                    .join(Status)
+                    .filter(State.department_id == management.department_id,
+                            State.management_id == management.id)
+                    .filter(Status.nameRU == status.nameRU)
+                    .all()
+                )
+                # emps = []
+                # for status_employee in status_list:
+                #     emps.append(status_employee.surname)
+                #     print(emps)
+                    # Добавляем статус в словарь
+                management_data[f"list_{status.nameEN}"] = {
+                    "surnames": [status_employee.surname for status_employee in status_list],
+                    "start_data": status.start_date,
+                    "end_data": status.end_date
+                }
+                print(management_data)
             # Добавляем информацию по каждому управлению в итоговый словарь
             result[management.nameKZ] = management_data
 
@@ -238,16 +296,16 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
             management_values = [
                 str(management_info.get("by state", {}).get("count", 0)),
                 str(management_info.get("by list", {}).get("count", 0)),
-                str(management_info.get("by status", {}).get("count", 0)),
                 str(management_info.get("by vacant", {}).get("count", 0)),
-                str(management_info.get("on leave", {}).get("count", 0)),
-                str(management_info.get("on sick leave", {}).get("count", 0)),
-                str(management_info.get("business trip", {}).get("count", 0)),
+                str(management_info.get("inline", {}).get("count", 0)),
                 str(management_info.get("on duty", {}).get("count", 0)),
                 str(management_info.get("after duty", {}).get("count", 0)),
+                str(management_info.get("business trip", {}).get("count", 0)),
                 str(management_info.get("on studying", {}).get("count", 0)),
-                str(management_info.get("on seconded", {}).get("count", 0)),
-                str(management_info.get("out seconded", {}).get("count", 0))
+                str(management_info.get("on leave", {}).get("count", 0)),
+                str(management_info.get("on sick leave", {}).get("count", 0)),
+                str(management_info.get("out seconded", {}).get("count", 0)),
+                str(management_info.get("on seconded", {}).get("count", 0))
             ]
 
             # Заполнение значений в ячейки таблицы
