@@ -20,7 +20,7 @@ class CompanyUpdate(CompanyBase):
 class CompanyRead(Model):
     id: int
     name: Optional[str]
-    departments: List[DepartmentRead] = []
-    managements: List[ManagementRead] = []
+    departments: List[DepartmentRead]
+    managements: List[ManagementRead]
 
 

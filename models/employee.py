@@ -9,6 +9,7 @@ class Employee(Model):
     surname = Column(String(128))
     firstname = Column(String(128))
     patronymic = Column(String(128))
+    iin = Column(String, nullable=True)
     sort = Column(Integer, nullable=False)
     photo = Column(String, nullable=True)
     note = Column(Text, nullable=True)

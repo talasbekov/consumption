@@ -22,6 +22,3 @@ class PositionRead(PositionBase, NamedModel):
 class PositionStateRead(Model):
     id: int
     name: Optional[str]
-
-    class Config:
-        orm_mode = True

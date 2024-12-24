@@ -8,9 +8,6 @@ class DivisionBase(NamedModel):
     titleEN: Optional[str]
     management_id: Optional[int]
 
-    class Config:
-        orm_mode = True
-
 
 class DivisionCreate(DivisionBase):
     pass
@@ -28,6 +25,3 @@ class DivisionRead(Model):
 class DivisionStateRead(Model):
     id: int
     nameRU: Optional[str]
-
-    class Config:
-        orm_mode = True

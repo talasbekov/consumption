@@ -188,6 +188,7 @@ def upgrade() -> None:
             sa.Column('surname', sa.String(length=128), nullable=False),
             sa.Column('firstname', sa.String(length=128), nullable=False),
             sa.Column('patronymic', sa.String(length=128), nullable=True),
+            sa.Column('iin', sa.String(length=12), nullable=True),
             sa.Column('sort', sa.Integer, nullable=False),
             sa.Column("photo", sa.String(length=1024), nullable=True),
             sa.Column("note", sa.Text, nullable=True),

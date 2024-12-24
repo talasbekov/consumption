@@ -1,7 +1,5 @@
 from typing import Optional, Text
 
-from pydantic import root_validator
-
 from schemas import Model, DivisionRead, RankRead, StatusRead, StatusCreate
 
 
@@ -9,14 +7,12 @@ class EmployeeBase(Model):
     surname: Optional[str]
     firstname: Optional[str]
     patronymic: Optional[str]
+    iin: Optional[str]
     sort: Optional[int]
     rank_id: Optional[int]
     photo: Optional[str]
     division_id: Optional[int]
     note: Optional[Text]
-
-    class Config:
-        orm_mode = True
 
 
 class EmployeeCreate(EmployeeBase):
@@ -40,6 +36,7 @@ class EmployeeStateRead(Model):
     surname: Optional[str]
     firstname: Optional[str]
     patronymic: Optional[str]
+    iin: Optional[str]
     sort: Optional[int]
     note: Optional[Text]
     photo: Optional[str]
@@ -47,13 +44,11 @@ class EmployeeStateRead(Model):
     ranks: Optional[RankRead]
     # states: Optional[List[StateRead]]
 
-    class Config:
-        orm_mode = True
-
-    @root_validator(pre=True)
-    def clear_start_end_dates_if_active(cls, values):
+    @classmethod
+    def clear_start_end_dates_if_active(cls, values: dict) -> dict:
         statuses = values.get("statuses")
         if statuses and statuses.name == "в строю":
+            # Обнуляем даты, если статус "в строю"
             statuses.start_date = None
             statuses.end_date = None
         return values
@@ -63,6 +58,7 @@ class EmployeeRandomCreate(Model):
     surname: Optional[str]
     firstname: Optional[str]
     patronymic: Optional[str]
+    iin: Optional[int]
     sort: Optional[int]
     rank_id: Optional[int]
     position_id: Optional[int]

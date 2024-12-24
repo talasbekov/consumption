@@ -19,6 +19,3 @@ class StatusUpdate(StatusBase):
 
 class StatusRead(StatusBase, NamedModel):
     id: int
-
-    class Config:
-        orm_mode = True

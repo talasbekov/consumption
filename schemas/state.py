@@ -9,9 +9,6 @@ class StateBase(Model):
     position_id: Optional[int]
     employee_id: Optional[int]
 
-    class Config:
-        orm_mode = True
-
 
 class StateCreate(StateBase):
     pass
@@ -29,17 +26,11 @@ class StateRead(Model):
     positions: Optional[PositionStateRead]
     employees: Optional[EmployeeStateRead]
 
-    class Config:
-        orm_mode = True
-
 
 class StateEmployeeRead(Model):
     id: int
     positions: Optional[PositionStateRead]
     employees: Optional[EmployeeStateRead]
-
-    class Config:
-        orm_mode = True
 
 
 class StateRandomCreate(Model):
@@ -55,6 +46,3 @@ class StateTreeRead(Model):
     departments: Optional[DepartmentStateRead]
     managements: Optional[ManagementStateRead]
     divisions: Optional[DivisionStateRead]
-
-    class Config:
-        orm_mode = True

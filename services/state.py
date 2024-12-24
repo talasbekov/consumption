@@ -130,10 +130,10 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
         by_list_count = state_count - vacant_count
         inline_count = (
             db.query(Employee)
-            .join(State)
-            .join(Status)
-            .filter(state.department_id == State.department_id)
-            .filter(Status.nameRU == "в строю")
+            .join(Employee.statuses)  # Присоединяем таблицу Status через отношение
+            .join(State, State.employee_id == Employee.id)  # Присоединяем State по employee_id
+            .filter(State.department_id == state.department_id)  # Фильтруем по department_id
+            .filter(Status.nameRU == "в строю")  # Условие для статуса
             .count()
         )
         by_status_count = by_list_count - inline_count
@@ -151,12 +151,13 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
         for status in statuses:
             count = (
                 db.query(Employee)
-                .join(State)
-                .join(Status)
-                .filter(state.department_id == State.department_id)
-                .filter(Status.nameRU == status.nameRU)
+                .join(Employee.statuses)  # Присоединяем таблицу Status через отношение
+                .join(State, State.employee_id == Employee.id)  # Присоединяем State по employee_id
+                .filter(State.department_id == state.department_id)  # Фильтруем по department_id
+                .filter(Status.nameRU == status.nameRU)  # Фильтруем по имени статуса
                 .count()
             )
+
             # Добавляем данные по каждому статусу в словарь
             result[status.nameEN] = {"count": count, "name": status.nameRU}
 
@@ -214,11 +215,13 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
             for status in statuses:
                 count = (
                     db.query(Employee)
-                    .join(State)
-                    .join(Status)
-                    .filter(State.department_id == management.department_id,
-                            State.management_id == management.id)
-                    .filter(Status.nameRU == status.nameRU)
+                    .join(Employee.statuses)  # Присоединяем таблицу Status через отношение
+                    .join(State, State.employee_id == Employee.id)  # Присоединяем таблицу State
+                    .filter(
+                        State.department_id == management.department_id,
+                        State.management_id == management.id,
+                    )  # Фильтруем по департаменту и управлению
+                    .filter(Status.nameRU == status.nameRU)  # Фильтруем по имени статуса
                     .count()
                 )
                 # Добавляем статус в словарь
