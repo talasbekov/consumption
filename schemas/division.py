@@ -6,6 +6,7 @@ class DivisionBase(NamedModel):
     titleRU: Optional[str]
     titleKZ: Optional[str]
     titleEN: Optional[str]
+    department_id: Optional[int]
     management_id: Optional[int]
 
 

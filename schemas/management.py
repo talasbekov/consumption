@@ -7,6 +7,7 @@ class ManagementBase(NamedModel):
     titleRU: Optional[str]
     titleKZ: Optional[str]
     titleEN: Optional[str]
+    company_id: Optional[int]
     department_id: Optional[int]
 
 

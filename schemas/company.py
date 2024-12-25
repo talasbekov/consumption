@@ -1,6 +1,6 @@
-from typing import Optional, List
+from typing import List
 
-from schemas import NamedModel, Model, ManagementRead, DepartmentRead
+from schemas import NamedModel, ManagementRead, DepartmentRead
 
 
 class CompanyBase(NamedModel):
@@ -17,9 +17,7 @@ class CompanyUpdate(CompanyBase):
     pass
 
 
-class CompanyRead(Model):
-    id: int
-    name: Optional[str]
+class CompanyRead(CompanyBase):
     departments: List[DepartmentRead]
     managements: List[ManagementRead]
 

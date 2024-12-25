@@ -7,6 +7,7 @@ class DepartmentBase(NamedModel):
     titleRU: Optional[str]
     titleKZ: Optional[str]
     titleEN: Optional[str]
+    company_id: Optional[int]
 
 
 class DepartmentCreate(DepartmentBase):

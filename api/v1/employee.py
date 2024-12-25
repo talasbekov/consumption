@@ -150,7 +150,7 @@ async def upload_excel(file: UploadFile, directory: str, db: Session = Depends(g
     try:
         # Читаем содержимое файла
         contents = await file.read()
-        df = pd.read_excel(BytesIO(contents), engine="openpyxl")
+        df = pd.read_excel(BytesIO(contents), engine="openpyxl", converters={"ИИН": lambda x: str(x).zfill(12)})
         df.columns = [col.strip() for col in df.columns]
 
         # Проверяем обязательные столбцы

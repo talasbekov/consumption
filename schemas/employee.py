@@ -11,6 +11,7 @@ class EmployeeBase(Model):
     sort: Optional[int]
     rank_id: Optional[int]
     photo: Optional[str]
+    management_id: Optional[int]
     division_id: Optional[int]
     note: Optional[Text]
 
@@ -42,6 +43,7 @@ class EmployeeStateRead(Model):
     photo: Optional[str]
     statuses: Optional[StatusRead]
     ranks: Optional[RankRead]
+
     # states: Optional[List[StateRead]]
 
     @classmethod
