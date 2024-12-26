@@ -28,3 +28,4 @@ class ManagementRead(Model):
 class ManagementStateRead(Model):
     id: int
     nameRU: Optional[str]
+    titleRU: Optional[str]

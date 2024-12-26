@@ -4,7 +4,7 @@ from schemas import NamedModel, Model
 
 
 class PositionBase(NamedModel):
-    category: Optional[str]
+    pass
 
 
 class PositionCreate(PositionBase):
@@ -21,4 +21,4 @@ class PositionRead(PositionBase, NamedModel):
 
 class PositionStateRead(Model):
     id: int
-    name: Optional[str]
+    nameRU: Optional[str]

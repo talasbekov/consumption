@@ -1,12 +1,12 @@
 from models import (
-    Employee, State
+    Employee, State, Department, Management, Division
 )  # Предполагается, что у вас есть модель Employee в models.py
 from schemas import (
     EmployeeCreate,
-    EmployeeUpdate,
+    EmployeeUpdate, StateRandomCreate,
 )  # Предполагается, что у вас есть схемы создания и обновления событий
 
-from services import user_service
+from services import user_service, data_service
 
 from pathlib import Path
 from typing import List
@@ -153,6 +153,82 @@ class EmployeeService(ServiceBase[Employee, EmployeeCreate, EmployeeUpdate]):
                 print(st.id)
 
         return employees
+
+    async def create_employee_states(self, db: Session):
+        # Предзагрузка данных
+        employees = db.query(Employee).all()
+        department = db.query(Department).first()
+
+        if not department:
+            print("Отдел отсутствует. Завершение операции.")
+            return
+
+        managements = db.query(Management).filter(Management.department_id == department.id).all()
+        if not managements:
+            print("Управления отсутствуют. Завершение операции.")
+            return
+
+        management_count = len(managements)
+        if management_count == 0:
+            print("Нет доступных управлений для распределения сотрудников. Завершение.")
+            return
+
+        employee_index = 0  # Индекс для распределения сотрудников
+
+        for management in managements:
+            # Получаем подразделения для текущего управления
+            divisions = db.query(Division).filter(Division.management_id == management.id).all()
+
+            if divisions:
+                # Распределение сотрудников между подразделениями
+                for division in divisions:
+                    if employee_index >= len(employees):
+                        break
+
+                    # Выбираем сотрудника для текущего подразделения
+                    employee = employees[employee_index]
+                    employee_index += 1
+
+                    # Создаем данные для state
+                    state_data = StateRandomCreate(
+                        department_id=department.id,
+                        management_id=management.id,
+                        division_id=division.id,
+                        position_id=1,
+                        employee_id=employee.id
+                    )
+
+                    # Создаем запись state
+                    created_state = data_service.create_state(db, state_data)
+                    if created_state is None:
+                        print(
+                            f"Ошибка при создании state для сотрудника {employee.id} в подразделении {division.id}. Пропуск.")
+            else:
+                # Если управление не имеет подразделений, назначаем сотрудников напрямую
+                if employee_index >= len(employees):
+                    break
+
+                employee = employees[employee_index]
+                employee_index += 1
+
+                state_data = StateRandomCreate(
+                    department_id=department.id,
+                    management_id=management.id,
+                    division_id=None,  # Нет подразделения
+                    position_id=1,
+                    employee_id=employee.id
+                )
+
+                created_state = data_service.create_state(db, state_data)
+                if created_state is None:
+                    print(
+                        f"Ошибка при создании state для сотрудника {employee.id} в управлении {management.id}. Пропуск.")
+
+        # Проверка на оставшихся сотрудников
+        if employee_index < len(employees):
+            print(f"Не удалось распределить {len(employees) - employee_index} сотрудников.")
+
+        print("Распределение сотрудников завершено.")
 
 
 employee_service = EmployeeService(Employee)

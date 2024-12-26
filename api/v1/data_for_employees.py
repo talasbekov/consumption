@@ -4,7 +4,7 @@ from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
 from core import get_db
 import logging
-from services import data_service
+from services import data_service, employee_service
 
 # Настройка логирования
 logger = logging.getLogger(__name__)
@@ -25,4 +25,9 @@ def populate_all(db:Session = Depends(get_db)):
 @router.post("/bulk/upload/photos")
 async def upload_photos(directory: str, db: Session = Depends(get_db)):
     return await data_service.upload_photos_from_directory(directory, db)
+
+
+@router.post("/bulk/upload/data/for/state")
+async def create_employee_states(db: Session = Depends(get_db)):
+    return await employee_service.create_employee_states(db)
 

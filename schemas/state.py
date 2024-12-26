@@ -20,7 +20,7 @@ class StateUpdate(StateBase):
 
 class StateRead(Model):
     id: Optional[int]
-    departments: Optional[DepartmentStateRead]
+    department: Optional[DepartmentStateRead]
     managements: Optional[ManagementStateRead]
     divisions: Optional[DivisionStateRead]
     positions: Optional[PositionStateRead]
@@ -43,6 +43,6 @@ class StateRandomCreate(Model):
 
 class StateTreeRead(Model):
     id: int
-    departments: Optional[DepartmentStateRead]
+    department: Optional[DepartmentStateRead]
     managements: Optional[ManagementStateRead]
     divisions: Optional[DivisionStateRead]

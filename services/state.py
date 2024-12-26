@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Optional, Any, List
 from fastapi import HTTPException
 from pydantic.tools import parse_obj_as
+from collections import defaultdict
 from sqlalchemy.orm import Session
 
 from docx import Document
@@ -13,7 +14,7 @@ from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 from io import BytesIO
 
-from models import State, Employee, Status, Management
+from models import State, Employee, Status, Management, status_employee_association
 from schemas import (
     StateCreate,
     StateUpdate,
@@ -221,31 +222,51 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
                         State.department_id == management.department_id,
                         State.management_id == management.id,
                     )  # Фильтруем по департаменту и управлению
-                    .filter(Status.nameRU == status.nameRU)  # Фильтруем по имени статуса
+                    .filter(Status.id == status.id)  # Фильтруем по id статуса
                     .count()
                 )
                 # Добавляем статус в словарь
                 management_data[status.nameEN] = {"count": count, "name": status.nameRU}
 
-                status_list = (
-                    db.query(Employee)
-                    .join(State)
-                    .join(Status)
-                    .filter(State.department_id == management.department_id,
-                            State.management_id == management.id)
-                    .filter(Status.nameRU == status.nameRU)
+                # Выполняем запрос для получения сотрудников с управлением и статусом
+                employees_by_management_and_status = (
+                    db.query(
+                        Management.id.label("management_id"),
+                        Management.nameRU,
+                        Status.id.label("status_id"),
+                        Status.nameRU,
+                        Employee.id.label("employee"),
+                        Employee.firstname,
+                        Employee.surname
+                    )
+                    .join(Employee, Employee.management_id == Management.id)
+                    .join(status_employee_association, Employee.id == status_employee_association.c.employee_id)
+                    .join(Status, Status.id == status_employee_association.c.status_id)
                     .all()
                 )
-                # emps = []
-                # for status_employee in status_list:
-                #     emps.append(status_employee.surname)
-                #     print(emps)
+
+                # Группируем результат вручную по управлению и статусу
+                grouped_data = defaultdict(lambda: {"employees": [], "count": 0})
+
+                for management_id, nameRU, status_id, nameRU, employee_id, firstname, surname in employees_by_management_and_status:
+                    grouped_data[(management, status)]["employees"].append(f"{firstname} {surname}")
+                    grouped_data[(management, status)]["count"] += 1
+
+                # Вывод данных
+                for (management, status), data in grouped_data.items():
+                    print(f"Управление: {management}, Статус: {status}")
+                    print(f"Количество сотрудников: {data['count']}")
+                    print("Список сотрудников:")
+                    for employee in data["employees"]:
+                        print(f"- {employee}")
+                    print()
+
                     # Добавляем статус в словарь
-                management_data[f"list_{status.nameEN}"] = {
-                    "surnames": [status_employee.surname for status_employee in status_list],
-                    "start_data": status.start_date,
-                    "end_data": status.end_date
-                }
+                    management_data[f"list_{status.nameEN}"] = {
+                        "surnames": [status_employee.surname for status_employee in status_list],
+                        "start_data": status.start_date,
+                        "end_data": status.end_date
+                    }
                 print(management_data)
             # Добавляем информацию по каждому управлению в итоговый словарь
             result[management.nameKZ] = management_data

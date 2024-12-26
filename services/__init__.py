@@ -6,7 +6,7 @@ from .management import management_service
 from .department import department_service
 from .company import company_service
 from .user import user_service
-from .employee import employee_service
 from .data_for_employees import data_service
+from .employee import employee_service
 from .state import state_service
 from .auth import auth_service

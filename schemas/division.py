@@ -26,3 +26,4 @@ class DivisionRead(Model):
 class DivisionStateRead(Model):
     id: int
     nameRU: Optional[str]
+    titleRU: Optional[str]

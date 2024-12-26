@@ -1,6 +1,6 @@
 from typing import Optional, Text
 
-from schemas import Model, DivisionRead, RankRead, StatusRead, StatusCreate
+from schemas import Model, DivisionRead, RankRead
 
 
 class EmployeeBase(Model):
@@ -41,19 +41,19 @@ class EmployeeStateRead(Model):
     sort: Optional[int]
     note: Optional[Text]
     photo: Optional[str]
-    statuses: Optional[StatusRead]
+    # statuses: Optional[StatusRead]
     ranks: Optional[RankRead]
 
     # states: Optional[List[StateRead]]
 
-    @classmethod
-    def clear_start_end_dates_if_active(cls, values: dict) -> dict:
-        statuses = values.get("statuses")
-        if statuses and statuses.name == "в строю":
-            # Обнуляем даты, если статус "в строю"
-            statuses.start_date = None
-            statuses.end_date = None
-        return values
+    # @classmethod
+    # def clear_start_end_dates_if_active(cls, values: dict) -> dict:
+    #     statuses = values.get("statuses")
+    #     if statuses and statuses.name == "в строю":
+    #         # Обнуляем даты, если статус "в строю"
+    #         statuses.start_date = None
+    #         statuses.end_date = None
+    #     return values
 
 
 class EmployeeRandomCreate(Model):
@@ -71,7 +71,7 @@ class EmployeeDataBulkUpdate(Model):
     employee_id: Optional[int]
     rank_id: Optional[int]
     sort: Optional[int]
-    statuses: Optional[StatusCreate]
+    # statuses: Optional[StatusCreate]
     note: Optional[Text]
 
     class Config:

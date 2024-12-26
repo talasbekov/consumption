@@ -27,3 +27,4 @@ class DepartmentRead(Model):
 class DepartmentStateRead(Model):
     id: int
     nameRU: Optional[str]
+    titleRU: Optional[str]
