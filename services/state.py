@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from pydantic.tools import parse_obj_as
 
 from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from docx import Document
@@ -65,12 +66,16 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
 
     async def update_employees_by_state(self, db: Session, employees_data: List[EmployeeDataBulkUpdate]):
         try:
-            # Парсим данные в объекты EmployeeBulkUpdate
+            # Парсим входящие данные в список объектов EmployeeDataBulkUpdate
             employees_list = parse_obj_as(List[EmployeeDataBulkUpdate], employees_data)
 
+            employee_ids = [employee_data.employee_id for employee_data in employees_list]
+            # Получаем все записи сотрудников за один запрос
+            employees = db.query(Employee).filter(Employee.id.in_(employee_ids)).all()
+            employees_dict = {employee.id: employee for employee in employees}
+
             for employee_data in employees_list:
-                # Получаем запись сотрудника по ID
-                employee = db.query(Employee).filter(Employee.id == employee_data.employee_id).first()
+                employee = employees_dict.get(employee_data.employee_id)
                 if not employee:
                     logging.error(f"Employee with ID {employee_data.employee_id} not found")
                     continue
@@ -83,24 +88,28 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
 
                 # Обновление статусов, если они переданы
                 if employee_data.statuses:
-                    # Очищаем старые статусы или добавляем новые
                     new_status = Status(
                         start_date=employee_data.statuses.start_date,
                         end_date=employee_data.statuses.end_date,
                         note=employee_data.statuses.note,
                     )
+                    # Если требуется полностью заменить статусы
+                    employee.statuses.clear()
                     employee.statuses.append(new_status)
 
                 logging.info(f"Employee with ID {employee_data.employee_id} updated successfully")
 
-            # Коммитим все изменения за один раз
+            # Сохраняем изменения в базе
             db.commit()
             logging.info("All employees updated successfully")
-
-        except Exception as e:
-            logging.error(f"Error while processing employees: {e}")
+        except SQLAlchemyError as e:
+            logging.error(f"Database error while processing employees: {e}")
             db.rollback()
             raise HTTPException(status_code=500, detail="An error occurred while updating employees")
+        except Exception as e:
+            logging.error(f"Unexpected error: {e}")
+            db.rollback()
+            raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
     def get_count_of_state(self, db: Session, user_id: int)-> dict[Any, int]:
         print(user_id)
@@ -251,111 +260,6 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
 
         return result
 
-    # def get_count_of_management_state(self, db: Session, user_id: int) -> dict[str, dict[str, dict[str, int]]]:
-    #     # Получаем пользователя по user_id
-    #     user = user_service.get_by_id(db, user_id)
-    #     state = self.get_by_employee_id(db, user.employee_id)
-    #
-    #     if state is not None:
-    #         print("Found state:", state)
-    #     else:
-    #         print("No valid state found")
-    #
-    #     # Получаем общее количество из первой функции
-    #     overall_count = self.get_count_of_state(db, user_id)
-    #
-    #     # Инициализируем итоговый словарь
-    #     result = {}
-    #
-    #     # Получаем все управления для текущего отдела
-    #     managements = db.query(Management).filter(Management.department_id == state.department_id).all()
-    #
-    #     for management in managements:
-    #         # Считаем количество по штату, вакантных сотрудников и т.д.
-    #         state_count = db.query(self.model).filter(self.model.department_id == management.department_id,
-    #                                                   self.model.management_id == management.id).count()
-    #         vacant_count = db.query(self.model).filter(self.model.employee_id.is_(None),
-    #                                                    self.model.department_id == management.department_id,
-    #                                                    self.model.management_id == management.id).count()
-    #         by_list_count = state_count - vacant_count
-    #
-    #         # Формируем структуру для управления
-    #         management_data = {
-    #             "by state": {"count": state_count, "name": "по штату"},
-    #             "by list": {"count": by_list_count, "name": "по списку"},
-    #             "by vacant": {"count": vacant_count, "name": "ваканты"},
-    #             # "by status": {"count": by_status_count, "name": "общее количество отсутствующих"}
-    #         }
-    #
-    #         # Получаем данные по каждому статусу
-    #         statuses = db.query(Status).all()
-    #         for status in statuses:
-    #             count = (
-    #                 db.query(Employee)
-    #                 .join(Employee.statuses)  # Присоединяем таблицу Status через отношение
-    #                 .join(State, State.employee_id == Employee.id)  # Присоединяем таблицу State
-    #                 .filter(
-    #                     State.department_id == management.department_id,
-    #                     State.management_id == management.id,
-    #                 )  # Фильтруем по департаменту и управлению
-    #                 .filter(Status.id == status.id)  # Фильтруем по id статуса
-    #                 .count()
-    #             )
-    #             # Добавляем статус в словарь
-    #             management_data[status.nameEN] = {"count": count, "name": status.nameRU}
-    #
-    #             # Выполняем запрос для получения сотрудников с управлением и статусом
-    #             employees_by_management_and_status = (
-    #                 db.query(
-    #                     State.id.label("state_id"),
-    #                     Management.id.label("management_id"),
-    #                     Management.nameRU,
-    #                     Employee.id.label("employee"),
-    #                     Employee.firstname,
-    #                     Employee.surname,
-    #                     Status.id.label("status_id"),
-    #                     Status.nameRU,
-    #                     Status.note,
-    #                     Status.start_date,
-    #                     Status.end_date,
-    #                 )
-    #                 .join(Employee, Employee.id == State.employee_id)
-    #                 .join(State, State.management_id == Management.id)
-    #                 .join(status_employee_association, Employee.id == status_employee_association.c.employee_id)
-    #                 .join(Status, Status.id == status_employee_association.c.status_id)
-    #                 .all()
-    #             )
-    #
-    #             # Группируем результат вручную по управлению и статусу
-    #             grouped_data = defaultdict(lambda: {"employees": [], "count": 0})
-    #
-    #             for status_id, nameRU, employee_id, firstname, surname in employees_by_management_and_status:
-    #                 grouped_data[(management_name)]["employees"].append(f"{firstname} {surname}")
-    #                 # Добавляем статус в словарь
-    #                 management_data[f"list_{status.nameEN}"] = {
-    #                     "surnames": [status_employee.surname for status_employee in status_list],
-    #                     "start_data": status.start_date,
-    #                     "end_data": status.end_date
-    #                 }
-    #                 grouped_data[(management, status)]["count"] += 1
-    #
-    #             # Вывод данных
-    #             for (management_name, status), data in grouped_data.items():
-    #                 print(f"Управление: {management}, Статус: {status}")
-    #                 print(f"Количество сотрудников: {data['count']}")
-    #                 print("Список сотрудников:")
-    #                 for employee in data["employees"]:
-    #                     print(f"- {employee}")
-    #                 print()
-    #
-    #
-    #             print(management_data)
-    #         # Добавляем информацию по каждому управлению в итоговый словарь
-    #         result[management.nameKZ] = management_data
-    #
-    #     # Добавляем общее количество в итоговый словарь
-    #     result["Жалпы есеп"] = overall_count
-    #
     # result = {
     #     Название управление: {
     #         "by state": {"count": state_count, "name": "по штату"},
@@ -371,8 +275,6 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
     #         }
     #     }
     # }
-    #
-    #     return result
 
     def create_word_report_from_template(self, db: Session, user_id: int):
         """

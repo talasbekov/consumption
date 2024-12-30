@@ -5,6 +5,7 @@ from typing import List
 import aiofiles
 from fastapi import APIRouter, Depends, status, UploadFile, HTTPException
 from fastapi.security import HTTPBearer
+from fastapi_jwt_auth import AuthJWT
 
 from sqlalchemy.orm import Session
 import pandas as pd
@@ -209,7 +210,7 @@ async def upload_excel(file: UploadFile, directory: str, db: Session = Depends(g
                     processed_photo_path = photo_directory / f"{iin}.JPG"
                     try:
                         image.save(processed_photo_path)
-                        photo_url = f"./media/images/fotoforportal/{iin}.JPG"
+                        photo_url = f"/media/images/fotoforportal/{iin}.JPG"
                         print(f"Processed photo saved for IIN: {iin}")
                     except Exception as e:
                         print(f"Error saving processed image for IIN {iin}: {e}")
@@ -239,3 +240,12 @@ async def upload_excel(file: UploadFile, directory: str, db: Session = Depends(g
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing file: {e}")
+
+@router.post(
+    "/bulk/upload/photos/for/employee/states/",
+    summary="Bulk update Employee's photos for employee states"
+    )
+async def upload_photos_to_employees(*, directory: str, db: Session = Depends(get_db), Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+    user_id = Authorize.get_jwt_subject()
+    return await employee_service.upload_photos_to_employees(db, directory, user_id)
