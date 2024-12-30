@@ -1,6 +1,6 @@
-from typing import Optional, Text
+from typing import Optional, Text, List
 
-from schemas import Model, DivisionRead, RankRead
+from schemas import Model, DivisionRead, RankRead, StatusUpdate, StatusRead
 
 
 class EmployeeBase(Model):
@@ -41,7 +41,7 @@ class EmployeeStateRead(Model):
     sort: Optional[int]
     note: Optional[Text]
     photo: Optional[str]
-    # statuses: Optional[StatusRead]
+    statuses: Optional[StatusRead]
     ranks: Optional[RankRead]
 
     # states: Optional[List[StateRead]]
@@ -71,11 +71,8 @@ class EmployeeDataBulkUpdate(Model):
     employee_id: Optional[int]
     rank_id: Optional[int]
     sort: Optional[int]
-    # statuses: Optional[StatusCreate]
-    note: Optional[Text]
-
-    class Config:
-        orm_mode = True
+    note: Optional[str]
+    statuses: Optional[List[StatusUpdate]]  # Список объектов статусов
 
 
 class EmployeePhotoBulkUpdate(Model):

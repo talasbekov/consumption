@@ -11,7 +11,7 @@ from schemas import (
 from services import user_service, data_service
 
 from pathlib import Path
-from typing import List
+from typing import List, Type
 
 from fastapi import UploadFile, HTTPException
 from PIL import Image, ImageOps
@@ -28,7 +28,7 @@ class EmployeeService(ServiceBase[Employee, EmployeeCreate, EmployeeUpdate]):
 
     async def upload_only_photos(
             self, db: Session, employee_ids: List[int], photos: List[UploadFile]
-    ) -> List[Employee]:
+    ) -> list[Type[Employee]]:
         employees = []
 
         for employee_id, photo in zip(employee_ids, photos):
@@ -37,7 +37,7 @@ class EmployeeService(ServiceBase[Employee, EmployeeCreate, EmployeeUpdate]):
                 print(f"Работодатель с employee_id {employee_id} не найден")
                 continue
 
-            file_location = Path(f"media/images/employee_photos/{employee.id}_{employee.surname}.jpg")
+            file_location = Path(f"media/images/employee_photos/{employee.iin}.jpg")
             file_location.parent.mkdir(parents=True, exist_ok=True)
 
             # Чтение и обработка изображения

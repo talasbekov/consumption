@@ -3,7 +3,6 @@ import os
 from datetime import datetime
 from typing import Optional, Any, List
 from fastapi import HTTPException
-from pydantic.tools import parse_obj_as
 
 from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
@@ -65,41 +64,53 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
     #         raise HTTPException(status_code=500, detail="An error occurred while updating employees")
 
     async def update_employees_by_state(self, db: Session, employees_data: List[EmployeeDataBulkUpdate]):
+        """
+        Обновляет данные сотрудников на основе входящего списка данных, включая статусы.
+        """
         try:
-            # Парсим входящие данные в список объектов EmployeeDataBulkUpdate
-            employees_list = parse_obj_as(List[EmployeeDataBulkUpdate], employees_data)
+            employee_ids = [employee_data.employee_id for employee_data in employees_data if employee_data.employee_id]
 
-            employee_ids = [employee_data.employee_id for employee_data in employees_list]
-            # Получаем все записи сотрудников за один запрос
+            # Получаем всех сотрудников одним запросом
             employees = db.query(Employee).filter(Employee.id.in_(employee_ids)).all()
             employees_dict = {employee.id: employee for employee in employees}
 
-            for employee_data in employees_list:
+            for employee_data in employees_data:
                 employee = employees_dict.get(employee_data.employee_id)
                 if not employee:
-                    logging.error(f"Employee with ID {employee_data.employee_id} not found")
+                    logging.warning(f"Employee with ID {employee_data.employee_id} not found")
                     continue
 
-                # Обновляем поля только если они заданы
+                # Обновляем основные данные сотрудника
                 if employee_data.sort is not None:
                     employee.sort = employee_data.sort
                 if employee_data.rank_id is not None:
                     employee.rank_id = employee_data.rank_id
+                if employee_data.note:
+                    employee.note = employee_data.note
 
-                # Обновление статусов, если они переданы
+                # Обновляем статусы сотрудника
                 if employee_data.statuses:
-                    new_status = Status(
-                        start_date=employee_data.statuses.start_date,
-                        end_date=employee_data.statuses.end_date,
-                        note=employee_data.statuses.note,
-                    )
-                    # Если требуется полностью заменить статусы
+                    # Очищаем текущие статусы
                     employee.statuses.clear()
-                    employee.statuses.append(new_status)
 
-                logging.info(f"Employee with ID {employee_data.employee_id} updated successfully")
+                    for status_data in employee_data.statuses:
+                        # Создаём новый объект статуса
+                        status = db.query(Status).filter_by(id=status_data.id).first()
+                        if not status:
+                            logging.warning(f"Status with ID {status_data.id} not found")
+                            continue
 
-            # Сохраняем изменения в базе
+                        # Обновляем даты и примечание статуса
+                        status.start_date = status_data.start_date
+                        status.end_date = status_data.end_date
+                        status.note = status_data.note
+
+                        # Привязываем статус к сотруднику
+                        employee.statuses.append(status)
+
+                    logging.info(f"Statuses updated for Employee {employee.id}")
+
+            # Сохраняем изменения
             db.commit()
             logging.info("All employees updated successfully")
         except SQLAlchemyError as e:

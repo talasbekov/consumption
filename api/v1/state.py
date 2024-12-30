@@ -1,11 +1,10 @@
-import json
 import logging
 from typing import List
 
-from fastapi import APIRouter, Depends, status, UploadFile, File, Form, HTTPException, Response
+from fastapi import APIRouter, Depends, status, UploadFile, File, Form, HTTPException, Response, Body
 from fastapi.security import HTTPBearer
 from fastapi_jwt_auth import AuthJWT
-from pydantic.tools import parse_obj_as
+
 
 from sqlalchemy.orm import Session
 
@@ -233,7 +232,7 @@ async def upload_photo(
 async def upload_data(
     *,
     db: Session = Depends(get_db),
-    employee_data: str = Form(...),  # Ожидаем данные как строку через Form
+    employee_data: List[EmployeeDataBulkUpdate] = Body(...),  # Принимаем JSON
     Authorize: AuthJWT = Depends()
 ):
     """
@@ -245,15 +244,9 @@ async def upload_data(
     current_user = Authorize.get_jwt_subject()
     logging.info(f"User {current_user} is uploading employee data")
 
-    # Преобразуем строку employee_data в список объектов
-    try:
-        employee_data_list = parse_obj_as(List[EmployeeDataBulkUpdate], json.loads(employee_data))
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=422, detail="Invalid JSON format in employee_data")
-
     # Передаем данные в сервис для обновления сотрудников
     try:
-        await employee_service.update_employees_by_state(db, employee_data_list)
+        await state_service.update_employees_by_state(db, employee_data)
         return {"message": "Employees updated successfully"}
     except HTTPException as e:
         logging.error(f"Error updating employees: {e.detail}")
