@@ -1,11 +1,14 @@
+import logging
+from datetime import date
+
 import aiofiles
 
 from models import (
-    Employee, State, Department, Management, Division
+    Employee, State, Department, Management, Division, Status
 )  # Предполагается, что у вас есть модель Employee в models.py
 from schemas import (
     EmployeeCreate,
-    EmployeeUpdate, StateRandomCreate,
+    EmployeeUpdate, StateRandomCreate, StatusUpdate,
 )  # Предполагается, что у вас есть схемы создания и обновления событий
 
 from services import user_service, data_service
@@ -94,7 +97,7 @@ class EmployeeService(ServiceBase[Employee, EmployeeCreate, EmployeeUpdate]):
 
     async def upload_only_data(
             self, db: Session, employee_data_list: List[EmployeeDataBulkUpdate]
-    ) -> List[Employee]:
+    ) -> list[Type[Employee]]:
         employees = []
 
         for employee_data in employee_data_list:
@@ -289,6 +292,88 @@ class EmployeeService(ServiceBase[Employee, EmployeeCreate, EmployeeUpdate]):
             except Exception as e:
                 db.rollback()
                 print(f"Error processing photo for IIN {iin}: {e}")
+
+    async def assign_new_status(self, db: Session, employee_id: int, new_status_data: StatusUpdate):
+        """
+        Присваивает новый статус сотруднику.
+        """
+        try:
+            employee = db.query(Employee).filter(Employee.id == employee_id).first()
+            if not employee:
+                raise HTTPException(status_code=404, detail="Employee not found")
+
+            # Создаем новый статус
+            new_status = Status(
+                id=new_status_data["id"],
+                note=new_status_data.get("note"),
+                start_date=new_status_data["start_date"],
+                end_date=new_status_data["end_date"]
+            )
+            db.add(new_status)
+
+            # Привязываем статус к сотруднику
+            employee.statuses.append(new_status)
+
+            # Устанавливаем задачу для возврата в "в строю"
+            if new_status.end_date:
+                # Убедимся, что статус "в строю" существует
+                in_service_status = db.query(Status).filter(Status.nameRU == "в строю").first()
+                if not in_service_status:
+                    raise Exception("Status 'в строю' not found in the database")
+
+                # Планируем возвращение в "в строю" после истечения end_date
+                db.commit()
+                # schedule_reset_status_to_in_service(employee_id, new_status.end_date, db)
+            else:
+                db.commit()
+
+            logging.info(f"New status assigned to employee {employee_id}")
+        except Exception as e:
+            logging.error(f"Error assigning new status: {e}")
+            db.rollback()
+            raise
+
+    async def update_employees_statuses(self, db: Session):
+        """
+        Проверяет статусы сотрудников и обновляет их:
+        - Если статус пустой, устанавливается "в строю".
+        - Если есть статус "в строю", он остаётся.
+        - Если статус истёк, меняется на "в строю".
+        """
+        try:
+            # Получаем статус "в строю"
+            in_service_status = db.query(Status).filter(Status.nameRU == "в строю").first()
+            if not in_service_status:
+                raise Exception("Status 'в строю' not found in the database")
+
+            # Получаем всех сотрудников
+            all_employees = db.query(Employee).all()
+
+            for employee in all_employees:
+                if not employee.statuses:
+                    # Если у сотрудника нет статуса, устанавливаем "в строю"
+                    employee.statuses.append(in_service_status)
+                    logging.info(f"Employee {employee.id} had no status. Set to 'в строю'.")
+                else:
+                    # Проверяем текущие статусы сотрудника
+                    current_status = employee.statuses[0]  # Предполагается, что статус один
+                    if current_status.nameRU == "в строю":
+                        # Если статус уже "в строю", ничего не меняем
+                        logging.info(f"Employee {employee.id} already has status 'в строю'.")
+                        continue
+                    elif current_status.end_date and current_status.end_date <= date.today():
+                        # Если статус истёк, меняем на "в строю"
+                        employee.statuses.clear()  # Убираем текущий статус
+                        employee.statuses.append(in_service_status)
+                        logging.info(f"Employee {employee.id} status expired. Set to 'в строю'.")
+
+            # Сохраняем изменения
+            db.commit()
+            logging.info("Employee statuses updated successfully.")
+        except Exception as e:
+            logging.error(f"Error while updating statuses: {e}")
+            db.rollback()
+            raise
 
 
 employee_service = EmployeeService(Employee)

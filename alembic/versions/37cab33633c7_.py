@@ -197,7 +197,6 @@ def upgrade() -> None:
             sa.Column('rank_id', sa.Integer, sa.ForeignKey('ranks.id')),
             sa.Column('division_id', sa.Integer, sa.ForeignKey('divisions.id'), nullable=True, index=True),
             sa.Column('management_id', sa.Integer, sa.ForeignKey('managements.id'), nullable=True, index=True),
-            sa.Column('status_id', sa.Integer, sa.ForeignKey('statuses.id')),
             sa.Column(
                 'created_at', sa.DateTime, nullable=False, server_default=sa.func.now()
             ),

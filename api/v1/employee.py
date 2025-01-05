@@ -14,7 +14,7 @@ from PIL import Image
 from core import get_db
 from models import Employee
 # from models import Employee
-from schemas import EmployeeRead, EmployeeUpdate, EmployeeCreate
+from schemas import EmployeeRead, EmployeeUpdate, EmployeeCreate, StatusUpdate
 from services import employee_service
 
 router = APIRouter(prefix="/employees", tags=["Employees"], dependencies=[Depends(HTTPBearer())])
@@ -249,3 +249,29 @@ async def upload_photos_to_employees(*, directory: str, db: Session = Depends(ge
     Authorize.jwt_required()
     user_id = Authorize.get_jwt_subject()
     return await employee_service.upload_photos_to_employees(db, directory, user_id)
+
+
+@router.post(
+    "/add/status/",
+    response_model=StatusUpdate,
+    summary="Add Employee's statuses",
+    dependencies=[Depends(HTTPBearer())]
+    )
+async def add_new_status(
+        *,
+        employee_id: int,
+        new_status_data: StatusUpdate,  # Принимаем JSON
+        db: Session = Depends(get_db),
+        Authorize: AuthJWT = Depends()
+):
+    Authorize.jwt_required()
+    return await employee_service.assign_new_status(db, employee_id, new_status_data)
+
+
+@router.post(
+    "/update/statuses/",
+    summary="Update Employee's statuses"
+    )
+async def update_employees_statuses(*, db: Session = Depends(get_db), Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+    return await employee_service.update_employees_statuses(db)

@@ -41,19 +41,8 @@ class EmployeeStateRead(Model):
     sort: Optional[int]
     note: Optional[Text]
     photo: Optional[str]
-    statuses: Optional[StatusRead]
+    statuses: Optional[List[StatusRead]]
     ranks: Optional[RankRead]
-
-    # states: Optional[List[StateRead]]
-
-    # @classmethod
-    # def clear_start_end_dates_if_active(cls, values: dict) -> dict:
-    #     statuses = values.get("statuses")
-    #     if statuses and statuses.name == "в строю":
-    #         # Обнуляем даты, если статус "в строю"
-    #         statuses.start_date = None
-    #         statuses.end_date = None
-    #     return values
 
 
 class EmployeeRandomCreate(Model):

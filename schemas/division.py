@@ -20,7 +20,7 @@ class DivisionUpdate(DivisionBase):
 
 class DivisionRead(Model):
     id: Optional[int]
-    name: Optional[str]
+    nameRU: Optional[str]
 
 
 class DivisionStateRead(Model):
