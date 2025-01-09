@@ -17,7 +17,7 @@ router = APIRouter(prefix="/statuses", tags=["Statuses"], dependencies=[Depends(
     "",
     dependencies=[Depends(HTTPBearer())],
     response_model=List[StatusRead],
-    summary="Get all Statuses",
+    summary="Статусы",
 )
 async def get_all(
     *,

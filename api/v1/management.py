@@ -17,7 +17,7 @@ router = APIRouter(prefix="/managements", tags=["Managements"], dependencies=[De
     "",
     dependencies=[Depends(HTTPBearer())],
     response_model=List[ManagementRead],
-    summary="Get all Managements",
+    summary="Структура службы",
 )
 async def get_all(
     *,

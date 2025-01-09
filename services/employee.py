@@ -40,7 +40,7 @@ class EmployeeService(ServiceBase[Employee, EmployeeCreate, EmployeeUpdate]):
                 print(f"Работодатель с employee_id {employee_id} не найден")
                 continue
 
-            file_location = Path(f"media/images/employee_photos/{employee.iin}.jpg")
+            file_location = Path(f"media/images/employee_photos/{employee.iin}.JPG")
             file_location.parent.mkdir(parents=True, exist_ok=True)
 
             # Чтение и обработка изображения
@@ -282,11 +282,11 @@ class EmployeeService(ServiceBase[Employee, EmployeeCreate, EmployeeUpdate]):
                 image = self.crop_to_aspect_ratio(image, 3, 4)
 
                 # Сохранение обработанного изображения
-                processed_photo_path = photo_directory / f"processed_{iin}.JPG"
+                processed_photo_path = photo_directory / f"{iin}.JPG"
                 image.save(processed_photo_path)
 
                 # Обновление записи сотрудника
-                employee.photo = f"/media/images/fotoforportal/processed_{iin}.JPG"
+                employee.photo = f"/media/images/fotoforportal/{iin}.JPG"
                 db.commit()
                 print(f"Photo URL updated for IIN: {iin}")
             except Exception as e:

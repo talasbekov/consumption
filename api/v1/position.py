@@ -17,7 +17,7 @@ router = APIRouter(prefix="/positions", tags=["Positions"], dependencies=[Depend
     "",
     dependencies=[Depends(HTTPBearer())],
     response_model=List[PositionRead],
-    summary="Get all Positions",
+    summary="Все должностя",
 )
 async def get_all(
     *,

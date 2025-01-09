@@ -17,7 +17,7 @@ router = APIRouter(prefix="/ranks", tags=["Ranks"], dependencies=[Depends(HTTPBe
     "",
     dependencies=[Depends(HTTPBearer())],
     response_model=List[RankRead],
-    summary="Get all Ranks",
+    summary="Звания",
 )
 async def get_all(
     *,

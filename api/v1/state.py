@@ -20,7 +20,7 @@ router = APIRouter(prefix="/states", tags=["States"], dependencies=[Depends(HTTP
     "",
     dependencies=[Depends(HTTPBearer())],
     response_model=List[StateRead],
-    summary="Get all States",
+    summary="Штатка",
 )
 async def get_all(
     *,
@@ -122,7 +122,7 @@ async def delete(
 @router.get(
     "/count",
     dependencies=[Depends(HTTPBearer())],
-    summary="Get all States",
+    summary="Количественный свод статусов",
 )
 async def get_all_counts(
     *,

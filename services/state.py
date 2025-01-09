@@ -31,38 +31,6 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
     def get_by_employee_id(self, db: Session, employee_id: int) -> Optional[State]:
         return db.query(State).filter(State.employee_id == employee_id).first()
 
-    # async def update_employees_by_state(self, db: Session, employees_data: List[EmployeeDataBulkUpdate]):
-    #     try:
-    #         # Парсим данные в объекты EmployeeBulkUpdate
-    #         employees_list = parse_obj_as(List[EmployeeDataBulkUpdate], employees_data)
-    #
-    #         for employee_data in employees_list:
-    #             # Получаем запись работодателя по ID
-    #             employee = db.query(Employee).filter(Employee.id == employee_data.id).first()
-    #             if not employee:
-    #                 logging.error(f"Employee with ID {employee_data.id} not found")
-    #                 continue
-    #
-    #             # Обновляем поля только если они заданы
-    #             if employee_data.sort is not None:
-    #                 employee.sort = employee_data.sort
-    #             if employee_data.rank_id is not None:
-    #                 employee.rank_id = employee_data.rank_id
-    #             if employee_data.status_id is not None:
-    #                 employee.status_id = employee_data.status_id
-    #
-    #             # Добавляем работодателя в сессию
-    #             db.add(employee)
-    #
-    #         # Коммитим все изменения за один раз
-    #         db.commit()
-    #         logging.info("All employees updated successfully")
-    #
-    #     except Exception as e:
-    #         logging.error(f"Error while processing employees: {e}")
-    #         db.rollback()
-    #         raise HTTPException(status_code=500, detail="An error occurred while updating employees")
-
     async def update_employees_by_state(self, db: Session, employees_data: List[EmployeeDataBulkUpdate]):
         """
         Обновляет данные сотрудников на основе входящего списка данных, включая статусы.
