@@ -20,7 +20,7 @@ from fastapi import UploadFile, HTTPException
 from PIL import Image, ImageOps
 from io import BytesIO
 
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, InstrumentedAttribute
 
 from services.base import ServiceBase
 from schemas import EmployeeDataBulkUpdate
@@ -31,45 +31,66 @@ class EmployeeService(ServiceBase[Employee, EmployeeCreate, EmployeeUpdate]):
 
     async def upload_only_photos(
             self, db: Session, employee_ids: List[int], photos: List[UploadFile]
-    ) -> list[Type[Employee]]:
+    ) -> list[dict[str, InstrumentedAttribute]]:
         employees = []
 
         for employee_id, photo in zip(employee_ids, photos):
+            print(f"Начинаю обработку employee_id: {employee_id}, photo: {photo.filename}")
+
             employee = db.query(Employee).filter(Employee.id == employee_id).first()
             if not employee:
-                print(f"Работодатель с employee_id {employee_id} не найден")
+                print(f"Работодатель с employee_id {employee_id} не найден в базе данных")
                 continue
 
             file_location = Path(f"media/images/employee_photos/{employee.iin}.JPG")
             file_location.parent.mkdir(parents=True, exist_ok=True)
 
-            # Чтение и обработка изображения
-            file_contents = await photo.read()
-            image = Image.open(BytesIO(file_contents))
+            try:
+                # Чтение и обработка изображения
+                file_contents = await photo.read()
+                if not file_contents:
+                    print(f"Файл {photo.filename} пустой или не прочитан")
+                    continue
 
-            # Проверка режима изображения
-            if image.mode == "RGBA":
-                image = image.convert("RGB")  # Преобразуем в RGB
+                image = Image.open(BytesIO(file_contents))
 
-            # Обрезка изображения до соотношения сторон 3x4
-            image = self.crop_to_aspect_ratio(image, 3, 4)
+                # Проверка режима изображения
+                if image.mode == "RGBA":
+                    image = image.convert("RGB")  # Преобразуем в RGB
 
-            # Сохранение изображения
-            image.save(file_location, format="JPEG", quality=85)
+                # Обрезка изображения до соотношения сторон 3x4
+                image = self.crop_to_aspect_ratio(image, 3, 4)
 
-            # Обновляем путь к фотографии
-            employee.photo = str(file_location)
-            db.add(employee)
-            employees.append(employee)
+                # Сохранение изображения
+                image.save(file_location, format="JPEG", quality=85)
+
+                # Проверяем, создан ли файл
+                if file_location.exists():
+                    print(f"Фотография успешно сохранена: {file_location}")
+                else:
+                    print(f"Ошибка сохранения фотографии для employee_id {employee_id}")
+                    continue
+
+                # Обновляем путь к фотографии
+                employee.photo = str(file_location)
+                db.add(employee)
+                employees.append(employee)
+
+            except Exception as e:
+                print(f"Ошибка при обработке или сохранении фото для employee_id {employee_id}: {e}")
+                continue
 
         # Сохраняем изменения в БД
+        print(f"Сохранение изменений для {len(employees)} работников")
         db.commit()
 
         # Обновляем данные работодателей
         for employee in employees:
             db.refresh(employee)
+            print(f"Данные обновлены для employee_id {employee.id}")
 
-        return employees
+        return [{"employee_id": employee.id, "photo_path": employee.photo} for employee in employees]
+
 
     def crop_to_aspect_ratio(self, image: Image.Image, target_width_ratio: int,
                              target_height_ratio: int) -> Image.Image:

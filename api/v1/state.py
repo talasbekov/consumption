@@ -218,6 +218,7 @@ async def upload_photo(
 
     # Проверяем соответствие количества фотографий и employee_ids
     if len(photos) != len(employee_ids_list):
+        print(f"Количество фотографий ({len(photos)}) не совпадает с количеством employee_ids ({len(employee_ids_list)})")
         raise HTTPException(status_code=400, detail="The number of employees and photos does not match")
 
     # Передаем фотографии в сервис для обработки
