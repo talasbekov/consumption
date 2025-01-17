@@ -22,7 +22,14 @@ class ManagementUpdate(ManagementBase):
 class ManagementRead(Model):
     id: Optional[int]
     nameRU: Optional[str]
-    divisions: List[DivisionRead]
+    divisions: Optional[List[DivisionRead]]
+
+    def dict(self, *args, **kwargs):
+        data = super().dict(*args, **kwargs)
+        # Если divisions пустой список, заменяем на None
+        if isinstance(data['divisions'], list) and not data['divisions']:
+            data['divisions'] = None
+        return data
 
 
 class ManagementStateRead(Model):

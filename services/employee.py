@@ -257,6 +257,9 @@ class EmployeeService(ServiceBase[Employee, EmployeeCreate, EmployeeUpdate]):
         print("Распределение сотрудников завершено.")
 
     async def upload_photos_to_employees(self, db: Session, directory: str, user_id: int):
+        """
+        Асинхронное обновление фотографий сотрудников на основе файлов из указанной директории.
+        """
         # Получаем пользователя по ID
         user = user_service.get_by_id(db, user_id)
         if not user:
@@ -274,9 +277,16 @@ class EmployeeService(ServiceBase[Employee, EmployeeCreate, EmployeeUpdate]):
         ]
 
         # Проверяем директорию
-        photo_directory = Path(directory).resolve(strict=True)
-        if not photo_directory.exists() or not photo_directory.is_dir():
-            raise HTTPException(status_code=400, detail=f"Directory '{directory}' does not exist or is not a directory")
+        try:
+            photo_directory = Path(directory).resolve(strict=True)
+            if not photo_directory.exists() or not photo_directory.is_dir():
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Directory '{directory}' does not exist or is not a directory"
+                )
+        except Exception as e:
+            print(f"Ошибка проверки директории: {e}")
+            raise HTTPException(status_code=500, detail="Error accessing photo directory")
 
         for employee in employee_list:
             if not employee or not employee.iin:
@@ -289,30 +299,40 @@ class EmployeeService(ServiceBase[Employee, EmployeeCreate, EmployeeUpdate]):
                 print(f"Photo not found for IIN: {iin}")
                 continue
 
-            # Асинхронное чтение файла
-            async with aiofiles.open(photo_path, 'rb') as file:
-                file_contents = await file.read()
-
             try:
+                # Асинхронное чтение файла
+                async with aiofiles.open(photo_path, 'rb') as file:
+                    file_contents = await file.read()
+
                 # Открываем и обрабатываем изображение
                 image = Image.open(BytesIO(file_contents))
+                print(f"Открыто изображение для IIN: {iin}, размер: {image.size}")
+
                 if image.mode == "RGBA":
                     image = image.convert("RGB")
+                    print(f"Изображение для IIN {iin} конвертировано в RGB")
 
                 # Обрезка до соотношения 3:4
                 image = self.crop_to_aspect_ratio(image, 3, 4)
+                print(f"Изображение для IIN {iin} обрезано до соотношения 3:4")
 
                 # Сохранение обработанного изображения
                 processed_photo_path = photo_directory / f"{iin}.JPG"
-                image.save(processed_photo_path)
+                image.save(processed_photo_path, format="JPEG", quality=85)
+                print(f"Фото сохранено для IIN: {iin} по пути: {processed_photo_path}")
 
                 # Обновление записи сотрудника
-                employee.photo = f"/media/images/fotoforportal/{iin}.JPG"
+                employee.photo = f"media/images/fotoforportal/{iin}.JPG"
+                db.add(employee)
                 db.commit()
-                print(f"Photo URL updated for IIN: {iin}")
+                print(f"Photo URL updated in DB for IIN: {iin}")
+
             except Exception as e:
                 db.rollback()
                 print(f"Error processing photo for IIN {iin}: {e}")
+            finally:
+                # Освобождаем ресурсы, если это необходимо
+                image.close()
 
     async def assign_new_status(self, db: Session, employee_id: int, new_status_data: StatusUpdate):
         """
