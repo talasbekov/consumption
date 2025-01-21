@@ -43,7 +43,7 @@ class EmployeeStateRead(Model):
     sort: Optional[int]
     note: Optional[Text]
     photo: Optional[str]
-    statuses: Optional[List["EmployeeStatusRead"]]  # Связанные статусы сотрудника
+    statuses: Optional[List[EmployeeStatusRead]]  # Связанные статусы сотрудника
     ranks: Optional[RankRead]
 
     class Config:

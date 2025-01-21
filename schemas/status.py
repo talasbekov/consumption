@@ -1,7 +1,4 @@
-from typing import Optional, List
-
 from schemas import NamedModel
-from schemas.employee_status import EmployeeStatusRead
 
 
 class StatusBase(NamedModel):
@@ -14,8 +11,7 @@ class StatusUpdate(StatusBase):
     id: int
 
 class StatusRead(StatusBase):
-    id: int
-    employee_statuses: Optional[List[EmployeeStatusRead]]  # Связи с сотрудниками
+    id: int  # Связи с сотрудниками
 
     class Config:
         orm_mode = True

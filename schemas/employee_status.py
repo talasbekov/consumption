@@ -1,6 +1,6 @@
 from datetime import date
 from typing import Optional
-from schemas import Model
+from schemas import Model, StatusRead
 
 
 class EmployeeStatusBase(Model):
@@ -17,8 +17,8 @@ class EmployeeStatusUpdate(EmployeeStatusBase):
     pass
 
 class EmployeeStatusRead(EmployeeStatusBase):
-    id: int
-    # status: Optional[StatusRead]  # Связанный статус
+    id: Optional[int]
+    status: Optional[StatusRead]  # Связанный статус
 
     class Config:
         orm_mode = True

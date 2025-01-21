@@ -139,7 +139,8 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
         by_list_count = state_count - vacant_count
         inline_count = (
             db.query(Employee)
-            .join(Employee.statuses)  # Присоединяем таблицу Status через отношение
+            .join(EmployeeStatus, EmployeeStatus.employee_id == Employee.id)  # Присоединяем таблицу Status через отношение
+            .join(Status, Status.id == EmployeeStatus.status_id)
             .join(State, State.employee_id == Employee.id)  # Присоединяем State по employee_id
             .filter(State.department_id == state.department_id)  # Фильтруем по department_id
             .filter(Status.nameRU == "в строю")  # Условие для статуса
@@ -160,7 +161,8 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
         for status in statuses:
             count = (
                 db.query(Employee)
-                .join(Employee.statuses)  # Присоединяем таблицу Status через отношение
+                .join(EmployeeStatus, EmployeeStatus.employee_id == Employee.id)  # Присоединяем таблицу Status через отношение
+                .join(Status, Status.id == EmployeeStatus.status_id)
                 .join(State, State.employee_id == Employee.id)  # Присоединяем State по employee_id
                 .filter(State.department_id == state.department_id)  # Фильтруем по department_id
                 .filter(Status.nameRU == status.nameRU)  # Фильтруем по имени статуса
