@@ -345,10 +345,10 @@ class EmployeeService(ServiceBase[Employee, EmployeeCreate, EmployeeUpdate]):
 
             # Создаем новый статус
             new_status = Status(
-                id=new_status_data["id"],
-                note=new_status_data.get("note"),
-                start_date=new_status_data["start_date"],
-                end_date=new_status_data["end_date"]
+                id=new_status_data.id,
+                note=new_status_data.note,
+                start_date=new_status_data.start_date,
+                end_date=new_status_data.end_date
             )
             db.add(new_status)
 
@@ -357,12 +357,9 @@ class EmployeeService(ServiceBase[Employee, EmployeeCreate, EmployeeUpdate]):
 
             # Устанавливаем задачу для возврата в "в строю"
             if new_status.end_date:
-                # Убедимся, что статус "в строю" существует
                 in_service_status = db.query(Status).filter(Status.nameRU == "в строю").first()
                 if not in_service_status:
                     raise Exception("Status 'в строю' not found in the database")
-
-                # Планируем возвращение в "в строю" после истечения end_date
                 db.commit()
                 # schedule_reset_status_to_in_service(employee_id, new_status.end_date, db)
             else:

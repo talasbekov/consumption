@@ -1,6 +1,6 @@
 from sqlalchemy import Column, String, ForeignKey, Integer, Text
 from sqlalchemy.orm import relationship
-from models import Model, status_employee_association
+from models import Model
 
 
 class Employee(Model):
@@ -22,6 +22,7 @@ class Employee(Model):
     division = relationship("Division", back_populates="employees", lazy="select")
     states = relationship("State", back_populates="employees", lazy="joined")  # Используем lazy="joined", чтобы всегда делать JOIN
     ranks = relationship("Rank", back_populates="employees", lazy="select")
-    statuses = relationship("Status", secondary=status_employee_association, back_populates="employees", lazy="select")
+    # Связь с промежуточной таблицей EmployeeStatus
+    statuses = relationship("EmployeeStatus", back_populates="employee")
     users = relationship("User", back_populates="employees", lazy="select")
 

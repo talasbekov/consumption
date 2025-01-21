@@ -8,5 +8,6 @@ from .management import ManagementBase, ManagementRead, ManagementCreate, Manage
 from .department import DepartmentBase, DepartmentRead, DepartmentCreate, DepartmentUpdate, DepartmentStateRead
 from .company import CompanyRead, CompanyBase, CompanyCreate, CompanyUpdate
 from .status import StatusBase, StatusRead, StatusCreate, StatusUpdate
+from .employee_status import EmployeeStatusRead, EmployeeStatusBase, EmployeeStatusCreate, EmployeeStatusUpdate
 from .employee import EmployeeBase, EmployeeRead, EmployeeCreate, EmployeeUpdate, EmployeeStateRead, EmployeeRandomCreate, EmployeePhotoBulkUpdate, EmployeeDataBulkUpdate
 from .state import StateBase, StateRead, StateCreate, StateUpdate, StateEmployeeRead, StateRandomCreate, StateTreeRead

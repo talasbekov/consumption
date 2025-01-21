@@ -1,6 +1,7 @@
 from typing import Optional, Text, List
 
-from schemas import Model, DivisionRead, RankRead, StatusUpdate, StatusRead
+from schemas import Model, DivisionRead, RankRead
+from schemas.employee_status import EmployeeStatusUpdate, EmployeeStatusRead
 
 
 class EmployeeBase(Model):
@@ -27,6 +28,7 @@ class EmployeeUpdate(EmployeeBase):
 class EmployeeRead(EmployeeBase, Model):
     id: int
     divisions: Optional[DivisionRead]
+    statuses: Optional[List["EmployeeStatusRead"]]  # Связанные статусы сотрудника
 
     class Config:
         orm_mode = True
@@ -41,9 +43,11 @@ class EmployeeStateRead(Model):
     sort: Optional[int]
     note: Optional[Text]
     photo: Optional[str]
-    statuses: Optional[List[StatusRead]]
+    statuses: Optional[List["EmployeeStatusRead"]]  # Связанные статусы сотрудника
     ranks: Optional[RankRead]
 
+    class Config:
+        orm_mode = True
 
 class EmployeeRandomCreate(Model):
     surname: Optional[str]
@@ -61,7 +65,7 @@ class EmployeeDataBulkUpdate(Model):
     rank_id: Optional[int]
     sort: Optional[int]
     note: Optional[str]
-    statuses: Optional[List[StatusUpdate]]  # Список объектов статусов
+    statuses: Optional[EmployeeStatusUpdate]# Список объектов статусов
 
 
 class EmployeePhotoBulkUpdate(Model):

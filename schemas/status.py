@@ -1,24 +1,21 @@
-from datetime import date
-from typing import Optional
+from typing import Optional, List
 
-from schemas import NamedModel, Model
+from schemas import NamedModel
+from schemas.employee_status import EmployeeStatusRead
 
 
 class StatusBase(NamedModel):
-    start_date: Optional[date]
-    end_date: Optional[date]
-
+    pass
 
 class StatusCreate(StatusBase):
     pass
 
-
-class StatusUpdate(Model):
+class StatusUpdate(StatusBase):
     id: int
-    note: Optional[str]
-    start_date: Optional[date]
-    end_date: Optional[date]
 
-
-class StatusRead(StatusBase, NamedModel):
+class StatusRead(StatusBase):
     id: int
+    employee_statuses: Optional[List[EmployeeStatusRead]]  # Связи с сотрудниками
+
+    class Config:
+        orm_mode = True

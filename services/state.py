@@ -11,11 +11,9 @@ from sqlalchemy.orm import Session
 from docx import Document
 from docx.shared import Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.oxml.ns import qn
-from docx.oxml import OxmlElement
 from io import BytesIO
 
-from models import State, Employee, Status, Management
+from models import State, Employee, Status, Management, EmployeeStatus
 from schemas import (
     StateCreate,
     StateUpdate,
@@ -24,6 +22,22 @@ from schemas import EmployeeDataBulkUpdate
 from services import user_service
 
 from services.base import ServiceBase
+
+'''[
+  {
+    "employee_id": 8,
+    "rank_id": 5,
+    "sort": 88,
+    "note": "Test",
+    "statuses": {
+      "employee_id": 8,
+      "status_id": 4,
+      "start_date": "2025-01-21",
+      "end_date": "2025-02-21",
+      "note": "Test"
+    }
+  }
+]'''
 
 
 class StateService(ServiceBase[State, StateCreate, StateUpdate]):
@@ -56,27 +70,32 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
                 if employee_data.note:
                     employee.note = employee_data.note
 
-                # Обновляем статусы сотрудника
-                if employee_data.statuses:
-                    # Очищаем текущие статусы
-                    employee.statuses.clear()
+                # for chatgpt
+                employee_status = db.query(EmployeeStatus).filter(
+                    EmployeeStatus.employee_id == employee_data.employee_id).first()
 
-                    for status_data in employee_data.statuses:
-                        # Создаём новый объект статуса
-                        status = db.query(Status).filter_by(id=status_data.id).first()
-                        if not status:
-                            logging.warning(f"Status with ID {status_data.id} not found")
-                            continue
+                if not employee_status:
+                    # Create a new EmployeeStatus if it does not exist
+                    emp_status = EmployeeStatus(
+                        employee_id=employee_data.employee_id,
+                        status_id=employee_data.statuses.status_id,
+                        start_date=employee_data.statuses.start_date,
+                        end_date=employee_data.statuses.end_date,
+                        note=employee_data.statuses.note,
+                    )
+                    db.add(emp_status)
+                else:
+                    # Update the existing EmployeeStatus
+                    status_data = employee_data.statuses
 
-                        # Обновляем даты и примечание статуса
-                        status.start_date = status_data.start_date
-                        status.end_date = status_data.end_date
-                        status.note = status_data.note
+                    if status_data:
+                        # Update only if the new status data is provided
+                        employee_status.status_id = status_data.status_id
+                        employee_status.start_date = status_data.start_date
+                        employee_status.end_date = status_data.end_date
+                        employee_status.note = status_data.note
 
-                        # Привязываем статус к сотруднику
-                        employee.statuses.append(status)
-
-                    logging.info(f"Statuses updated for Employee {employee.id}")
+                    logging.info(f"Status updated for Employee ID {employee_data.employee_id}")
 
             # Сохраняем изменения
             db.commit()
@@ -204,10 +223,11 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
                         Employee.surname,
                         Employee.firstname,
                         Status.nameRU,
-                        Status.start_date,
-                        Status.end_date
+                        EmployeeStatus.start_date,
+                        EmployeeStatus.end_date
                     )
-                    .join(Employee.statuses)
+                    .join(EmployeeStatus, EmployeeStatus.employee_id == Employee.id)
+                    .join(Status, Status.id == EmployeeStatus.status_id)
                     .join(State, State.employee_id == Employee.id)
                     .filter(
                         State.department_id == management.department_id,
@@ -316,20 +336,49 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
                 cell = row.cells[i]
                 cell.text = value
 
-                # Настройка выравнивания и стиля текста
                 paragraph = cell.paragraphs[0]
                 paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 run = paragraph.runs[0]
                 run.font.size = Pt(12)
                 run.font.name = 'Times New Roman'
 
-                # Вертикальное выравнивание
-                tc = cell._element
-                tcPr = tc.get_or_add_tcPr()
-                tcVAlign = OxmlElement('w:vAlign')
-                # Для выравнивания по обеим сторонам (center)
-                tcVAlign.set(qn('w:val'), 'center')
-                tcPr.append(tcVAlign)
+                # Добавляем информацию о сотрудниках для текущего статуса
+                # status_key = list(management_info.keys())[i - 2]  # Получаем ключ статуса по индексу
+                # print(status_key)
+                # employees = management_info.get(status_key, {}).get(f"сотрудники со статусом {status_key.split()[-1]}",
+                #                                                     [])
+                for i, (status_key, status_info) in enumerate(management_info.items(), start=2):
+                    if status_key == "inline":  # Skip "inline" status if needed
+                        continue
+
+                    # Extract the name field to constru ct the employee list key
+                    name_field = status_info.get("name", "")
+                    if "(" in name_field:
+                        status_name_russian = name_field.split("(")[0].strip()
+                        employee_key = f"сотрудники со статусом {status_name_russian}"
+                    else:
+                        employee_key = f"сотрудники со статусом {name_field.strip()}"
+
+                    # Retrieve employees dynamically based on the constructed key
+                    employees = status_info.get(employee_key, [])
+
+                    # Get the cell corresponding to this status
+                    cell = row.cells[i]
+                    cell.text = ""  # Clear the cell for proper formatting
+
+                    # Add the count as the main value
+                    paragraph = cell.paragraphs[0]
+                    run_count = paragraph.add_run(str(status_info.get("count", 0)))  # Add count
+                    run_count.font.size = Pt(12)
+                    run_count.font.name = 'Times New Roman'
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+                    # Append employee details, if any
+                    for employee in employees:
+                        employee_text = f"\n{employee['ФИО']} ({employee['Дата начало']} - {employee['Дата окончание']})"
+                        run_employee = paragraph.add_run(employee_text)  # Add employee details
+                        run_employee.font.size = Pt(7)  # Smaller font for employee details
+                        run_employee.font.name = 'Times New Roman'
 
             # Сделать жирным последнюю строку
             if row_idx == total_rows - 1:  # Если это последняя строка
