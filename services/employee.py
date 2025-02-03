@@ -150,6 +150,7 @@ class EmployeeService(ServiceBase[Employee, EmployeeCreate, EmployeeUpdate]):
     async def get_employees_by_management(self, db: Session, user_id: int):
         # Получаем пользователя
         user = user_service.get_by_id(db, user_id)
+        print(user)
 
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
@@ -162,6 +163,7 @@ class EmployeeService(ServiceBase[Employee, EmployeeCreate, EmployeeUpdate]):
 
         # Получаем state для данного пользователя
         state = db.query(State).filter(State.employee_id == user.employee_id).first()
+        print(state)
 
         if not state:
             raise HTTPException(status_code=404, detail="State not found for the employee")
@@ -170,9 +172,9 @@ class EmployeeService(ServiceBase[Employee, EmployeeCreate, EmployeeUpdate]):
         employees = db.query(Employee).join(State).options(
             joinedload(Employee.states)  # Это загружает связанные объекты сразу
         ).filter(
-            State.management_id == state.management_id,
-            State.division_id.isnot(None)
+            State.management_id == state.management_id
         ).all()
+        print(employees)
         for emp in employees:
             print(emp.states)
             for st in emp.states:

@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse, RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi_jwt_auth import AuthJWT
 from fastapi_jwt_auth.exceptions import AuthJWTException, JWTDecodeError
+from fastapi.openapi.docs import get_swagger_ui_html
 from pydantic import ValidationError
 
 from api import router
@@ -30,6 +31,8 @@ app = FastAPI(
     version=configs.VERSION,
     openapi_url=f"{configs.API_V1_PREFIX}/openapi.json",
     debug=configs.DEBUG,
+    docs_url=None,
+    redoc_url=None
 )
 
 app.add_middleware(
@@ -112,7 +115,17 @@ def authjwt_exception_handler(request: Request, exc: AuthJWTException):
 
 @app.get("/", include_in_schema=False)
 async def docs_redirect():
-    return RedirectResponse(url="/api/client/auth")
+    return RedirectResponse(url="/api/v1/auth2/login")
+
+
+@app.get("/docs", include_in_schema=False)
+async def custom_swagger_ui_html():
+    return get_swagger_ui_html(
+        openapi_url=app.openapi_url,
+        title="Custom Swagger UI",
+        swagger_js_url="/static/swagger-ui/dist/swagger-ui-bundle.js",
+        swagger_css_url="/static/swagger-ui/dist/swagger-ui.css",
+    )
 
 
 # @app.websocket("/ws")

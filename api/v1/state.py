@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, status, UploadFile, File, Form, HTTPExce
 from fastapi.security import HTTPBearer
 from fastapi_jwt_auth import AuthJWT
 
-
+from urllib.parse import quote
 from sqlalchemy.orm import Session
 
 from core import get_db
@@ -263,12 +263,21 @@ async def upload_data(
 def download_word_report(db: Session = Depends(get_db), Authorize: AuthJWT = Depends()):
     Authorize.jwt_required()
     user_id = Authorize.get_jwt_subject()
+
     # Создаем Word документ
     word_file = state_service.create_word_report_from_template(db, user_id)
 
-    # Отправляем документ как файл
-    return Response(content=word_file.read(),
-                    media_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                    headers={"Content-Disposition": "attachment; filename=report.docx"})
+    # Безопасное кодирование имени файла
+    filename = "расход.docx"
+    filename_encoded = quote(filename.encode('utf-8'))  # Кодируем в UTF-8
+
+    # Отправляем документ с заголовком, который поддерживает не-ASCII символы
+    return Response(
+        content=word_file.read(),
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={
+            "Content-Disposition": f'attachment; filename*=UTF-8\'\'{filename_encoded}'
+        }
+    )
 
 

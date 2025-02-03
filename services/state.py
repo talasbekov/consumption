@@ -1,12 +1,12 @@
 import logging
 import os
-from datetime import datetime
-from typing import Optional, Any, List
+from datetime import datetime, date
+from typing import Optional, List
 from fastapi import HTTPException
 
 from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, InstrumentedAttribute
 
 from docx import Document
 from docx.shared import Pt
@@ -67,7 +67,7 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
                     employee.sort = employee_data.sort
                 if employee_data.rank_id is not None:
                     employee.rank_id = employee_data.rank_id
-                if employee_data.note:
+                if employee_data.note is not None:
                     employee.note = employee_data.note
 
                 # for chatgpt
@@ -81,7 +81,7 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
                         status_id=employee_data.statuses.status_id,
                         start_date=employee_data.statuses.start_date,
                         end_date=employee_data.statuses.end_date,
-                        note=employee_data.statuses.note,
+                        note=employee_data.statuses.note if employee_data.statuses.note else "",
                     )
                     db.add(emp_status)
                 else:
@@ -109,7 +109,9 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
             db.rollback()
             raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
-    def get_count_of_state(self, db: Session, user_id: int)-> dict[Any, int]:
+    def get_count_of_state(self, db: Session, user_id: int)-> dict[
+        str | InstrumentedAttribute, dict[str, int | str] | dict[str, int | str] | dict[str, int | str] | dict[
+            str, int | str] | dict[str, int | InstrumentedAttribute]]:
         print(user_id)
         user = user_service.get_by_id(db, user_id)
         print(user.employee_id)
@@ -188,13 +190,111 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
         # Инициализируем итоговый словарь
         result = {}
 
-        # Получаем все управления текущего департамента
-        managements = db.query(Management).filter(Management.department_id == state.department_id).all()
-
         # Получаем список всех статусов
         statuses = db.query(Status).all()
         statuses_dict = {status.id: {"nameRU": status.nameRU, "nameEN": status.nameEN} for status in statuses}
 
+        state_count = db.query(func.count(self.model.id)).filter(
+            self.model.department_id == state.department_id,
+            self.model.division_id.is_(None),
+            self.model.management_id.is_(None)
+        ).scalar()
+
+        vacant_count = db.query(func.count(self.model.id)).filter(
+            self.model.department_id == state.department_id,
+            self.model.employee_id.is_(None),
+            self.model.division_id.is_(None),
+            self.model.management_id.is_(None)
+        ).scalar()
+
+        by_list_count = state_count - vacant_count
+
+        # Формируем базовую структуру для управления
+        department_data = {
+            "by state": {"count": state_count, "name": "по штату"},
+            "by list": {"count": by_list_count, "name": "по списку"},
+            "by vacant": {"count": vacant_count, "name": "ваканты"},
+        }
+
+        # Получаем сотрудников для каждого статуса
+        for status_id, status_info in statuses_dict.items():
+            employees_with_status = (
+                db.query(
+                    Employee.surname,
+                    Employee.firstname,
+                    Status.nameRU,
+                    EmployeeStatus.start_date,
+                    EmployeeStatus.end_date,
+                    EmployeeStatus.note
+                )
+                .join(EmployeeStatus, EmployeeStatus.employee_id == Employee.id)
+                .join(Status, Status.id == EmployeeStatus.status_id)
+                .join(State, State.employee_id == Employee.id)
+                .filter(
+                    State.department_id == state.department_id,
+                    State.division_id.is_(None),
+                    State.management_id.is_(None),
+                    Status.id == status_id
+                )
+                .all()
+            )
+            print(employees_with_status, "qqq")
+
+            # Формируем список сотрудников и их данные для текущего статуса
+            employees_data = []
+            for surname, firstname, nameRU, start_date, end_date, note in employees_with_status:
+                def format_date(date_value):
+                    if date_value is None:
+                        return ""  # Возвращаем пустую строку, если дата отсутствует
+                    elif isinstance(date_value, datetime):
+                        return date_value.strftime("%d.%m.%Y")  # Форматируем объект datetime
+                    elif isinstance(date_value, date):
+                        # Преобразуем date в строку формата дд.мм.гггг
+                        return date_value.strftime("%d.%m.%Y")
+                    elif isinstance(date_value, str):
+                        try:
+                            # Предполагаем, что строка в формате YYYY-MM-DD
+                            parsed_date = datetime.strptime(date_value, "%Y-%m-%d")
+                            return parsed_date.strftime("%d.%m.%Y")
+                        except ValueError as e:
+                            print(f"Ошибка преобразования даты: {date_value}. {e}")  # Логируем ошибку
+                            return date_value  # Возвращаем исходное значение, если формат не подходит
+                    else:
+                        print(
+                            f"Неожиданный тип данных для даты: {date_value} ({type(date_value)})")  # Логируем неожиданный тип
+                        return ""
+
+                # Пробуем отформатировать даты
+                start_date_formatted = format_date(start_date)
+                end_date_formatted = format_date(end_date)
+
+                # Логирование для проверки результатов
+                print(f"Обработка сотрудника: {surname} {firstname}, {nameRU}")
+                print(f"Начало: {start_date} -> {start_date_formatted}")
+                print(f"Окончание: {end_date} -> {end_date_formatted}")
+
+                employees_data.append({
+                    "ФИО": f"{surname} {firstname[0].upper()}.",
+                    "Статус": nameRU,
+                    "Дата начало": start_date_formatted,
+                    "Дата окончание": end_date_formatted,
+                    "Примечание": note
+                })
+
+            # Добавляем информацию о статусе в структуру управления
+            department_data[status_info["nameEN"]] = {
+                "count": len(employees_data),
+                "name": f"{status_info['nameRU']} ({status_info['nameEN']})",
+                f"сотрудники со статусом {status_info['nameRU']}": employees_data
+            }
+
+        # Добавляем данные управления в итоговый результат
+        result["Басшылық"] = department_data
+
+
+
+        # Получаем все управления текущего департамента
+        managements = db.query(Management).filter(Management.department_id == state.department_id).all()
         # Основной цикл по управлениям
         for management in managements:
             # Считаем количество сотрудников "по штату", "по списку" и вакантных
@@ -226,7 +326,8 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
                         Employee.firstname,
                         Status.nameRU,
                         EmployeeStatus.start_date,
-                        EmployeeStatus.end_date
+                        EmployeeStatus.end_date,
+                        EmployeeStatus.note
                     )
                     .join(EmployeeStatus, EmployeeStatus.employee_id == Employee.id)
                     .join(Status, Status.id == EmployeeStatus.status_id)
@@ -241,12 +342,43 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
 
                 # Формируем список сотрудников и их данные для текущего статуса
                 employees_data = []
-                for surname, firstname, nameRU, start_date, end_date in employees_with_status:
+                for surname, firstname, nameRU, start_date, end_date, note in employees_with_status:
+                    def format_date(date_value):
+                        if date_value is None:
+                            return ""  # Возвращаем пустую строку, если дата отсутствует
+                        elif isinstance(date_value, datetime):
+                            return date_value.strftime("%d.%m.%Y")  # Форматируем объект datetime
+                        elif isinstance(date_value, date):
+                            # Преобразуем date в строку формата дд.мм.гггг
+                            return date_value.strftime("%d.%m.%Y")
+                        elif isinstance(date_value, str):
+                            try:
+                                # Предполагаем, что строка в формате YYYY-MM-DD
+                                parsed_date = datetime.strptime(date_value, "%Y-%m-%d")
+                                return parsed_date.strftime("%d.%m.%Y")
+                            except ValueError as e:
+                                print(f"Ошибка преобразования даты: {date_value}. {e}")  # Логируем ошибку
+                                return date_value  # Возвращаем исходное значение, если формат не подходит
+                        else:
+                            print(
+                                f"Неожиданный тип данных для даты: {date_value} ({type(date_value)})")  # Логируем неожиданный тип
+                            return ""
+
+                    # Пробуем отформатировать даты
+                    start_date_formatted = format_date(start_date)
+                    end_date_formatted = format_date(end_date)
+
+                    # Логирование для проверки результатов
+                    print(f"Обработка сотрудника: {surname} {firstname}, {nameRU}")
+                    print(f"Начало: {start_date} -> {start_date_formatted}")
+                    print(f"Окончание: {end_date} -> {end_date_formatted}")
+
                     employees_data.append({
-                        "ФИО": f"{surname} {firstname}",
+                        "ФИО": f"{surname} {firstname[0].upper()}.",
                         "Статус": nameRU,
-                        "Дата начало": start_date,
-                        "Дата окончание": end_date,
+                        "Дата начало": start_date_formatted,
+                        "Дата окончание": end_date_formatted,
+                        "Примечание": note
                     })
 
                 # Добавляем информацию о статусе в структуру управления
@@ -259,23 +391,17 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
             # Добавляем данные управления в итоговый результат
             result[management.nameKZ] = management_data
 
-        return result
+        # Получаем общий результат
+        overall_data = self.get_count_of_state(db, user_id)
 
-    # result = {
-    #     Название управление: {
-    #         "by state": {"count": state_count, "name": "по штату"},
-    #         "by list": {"count": by_list_count, "name": "по списку"},
-    #         "by vacant": {"count": vacant_count, "name": "ваканты"},
-    #         ...
-    #         "on sick leave": {
-    #             "count": vacant_count,
-    #             "name": "status.nameRU (на больничном)",
-    #             f"сотрудники со статусом {название статуса}": {
-    #                 "ФИО":f"{surname} {firstname}", "Статус": f"{status.nameRU} {status.start_date} {status.end_date}"
-    #             }
-    #         }
-    #     }
-    # }
+        # Удаляем ключ "by status", если он есть
+        if "by status" in overall_data:
+            del overall_data["by status"]
+
+        # Сохраняем в result
+        result["Барлығы"] = overall_data
+
+        return result
 
     def create_word_report_from_template(self, db: Session, user_id: int):
         """
@@ -295,13 +421,10 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
 
         # Изменяем первый параграф (перед таблицей)
         first_paragraph = doc.paragraphs[0]  # Получаем первый параграф документа
-        # Вставляем текст с датой
         run = first_paragraph.add_run(f"ЖЕТІНШІ ДЕПАРТАМЕНТ ЖЕКЕ ҚҰРАМЫНЫҢ САПТЫҚ ТІЗІМІ {current_date} ЖЫЛҒЫ")
-        # Применяем стиль к тексту (Times New Roman, размер 12)
         run.font.name = 'Times New Roman'
         run.font.size = Pt(14)
         run.bold = True  # Делаем текст жирным
-        # Настройка выравнивания по центру
         first_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
         # Поиск таблицы в документе
@@ -309,15 +432,15 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
 
         # Заполнение таблицы данными по каждому управлению
         row_idx = 2  # Строка для первого управления
-
-        # Получаем общее количество строк в таблице
         total_rows = len(table.rows)
 
         for management_name, management_info in management_data.items():
+            # Берём строку для конкретного управления
             row = table.rows[row_idx]
-            row.cells[1].text = management_name  # Название управления
+            # В ячейку с индексом 1 записываем название управления
+            row.cells[1].text = management_name
 
-            # Заполняем данные по каждому статусу для этого управления
+            # Заполняем данные по каждому «основному» статусу для этого управления
             management_values = [
                 str(management_info.get("by state", {}).get("count", 0)),
                 str(management_info.get("by list", {}).get("count", 0)),
@@ -333,64 +456,80 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
                 str(management_info.get("on seconded", {}).get("count", 0))
             ]
 
-            # Заполнение значений в ячейки таблицы
-            for i, value in enumerate(management_values, start=2):  # Начинаем с ячейки 2
+            # Записываем основные статусы (упрощённая логика)
+            for i, value in enumerate(management_values, start=2):  # Начинаем с 2
+                if i >= len(row.cells):
+                    # Предохранитель, если в таблице меньше столбцов, чем мы ожидаем
+                    break
+
                 cell = row.cells[i]
                 cell.text = value
 
                 paragraph = cell.paragraphs[0]
                 paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                run = paragraph.runs[0]
-                run.font.size = Pt(12)
-                run.font.name = 'Times New Roman'
+                run_main = paragraph.runs[0]
+                run_main.font.size = Pt(12)
+                run_main.font.name = 'Times New Roman'
 
-                # Добавляем информацию о сотрудниках для текущего статуса
-                # status_key = list(management_info.keys())[i - 2]  # Получаем ключ статуса по индексу
-                # print(status_key)
-                # employees = management_info.get(status_key, {}).get(f"сотрудники со статусом {status_key.split()[-1]}",
-                #                                                     [])
-                for i, (status_key, status_info) in enumerate(management_info.items(), start=2):
-                    if status_key == "inline":  # Skip "inline" status if needed
-                        continue
+            # Далее ВНУТРЕННИЙ ЦИКЛ по элементам словаря management_info.
+            # Раньше здесь использовалась та же переменная i; теперь используем j.
+            for j, (status_key, status_info) in enumerate(management_info.items(), start=2):
+                # Пропускаем статус "inline", если такова логика
+                if status_key == "inline":
+                    continue
 
-                    # Extract the name field to constru ct the employee list key
-                    name_field = status_info.get("name", "")
-                    if "(" in name_field:
-                        status_name_russian = name_field.split("(")[0].strip()
-                        employee_key = f"сотрудники со статусом {status_name_russian}"
-                    else:
-                        employee_key = f"сотрудники со статусом {name_field.strip()}"
+                # Определяем ячейку, куда писать
+                if j >= len(row.cells):
+                    # Не пишем, если столбцы закончились
+                    break
 
-                    # Retrieve employees dynamically based on the constructed key
-                    employees = status_info.get(employee_key, [])
+                cell = row.cells[j]
+                # Очищаем ячейку для форматирования
+                cell.text = ""
 
-                    # Get the cell corresponding to this status
-                    cell = row.cells[i]
-                    cell.text = ""  # Clear the cell for proper formatting
+                # Формируем текст для статуса
+                paragraph = cell.paragraphs[0]
 
-                    # Add the count as the main value
-                    paragraph = cell.paragraphs[0]
-                    run_count = paragraph.add_run(str(status_info.get("count", 0)))  # Add count
-                    run_count.font.size = Pt(12)
-                    run_count.font.name = 'Times New Roman'
-                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                # Записываем счётчик (кол-во сотрудников в этом статусе)
+                run_count = paragraph.add_run(str(status_info.get("count", 0)))
+                run_count.font.size = Pt(12)
+                run_count.font.name = 'Times New Roman'
+                paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-                    # Append employee details, if any
-                    for employee in employees:
-                        employee_text = f"\n{employee['ФИО']} ({employee['Дата начало']} - {employee['Дата окончание']})"
-                        run_employee = paragraph.add_run(employee_text)  # Add employee details
-                        run_employee.font.size = Pt(7)  # Smaller font for employee details
-                        run_employee.font.name = 'Times New Roman'
+                # Получаем ключ для списка сотрудников
+                name_field = status_info.get("name", "")
+                if "(" in name_field:
+                    # Например, "в командировке (business trip)" -> вычленяем "в командировке"
+                    status_name_russian = name_field.split("(")[0].strip()
+                    employee_key = f"сотрудники со статусом {status_name_russian}"
+                else:
+                    # Если нет скобок, берём всё как есть
+                    employee_key = f"сотрудники со статусом {name_field.strip()}"
 
-            # Сделать жирным последнюю строку
-            if row_idx == total_rows - 1:  # Если это последняя строка
+                # Получаем список сотрудников
+                employees = status_info.get(employee_key, [])
+
+                # Добавляем детальные сведения о каждом сотруднике
+                for employee in employees:
+                    employee_text = (
+                        f"\n{employee['ФИО']}"
+                        f"\n{employee['Дата начало']}-{employee['Дата окончание']}"
+                        f"\n{employee['Примечание']}"
+                    )
+                    run_employee = paragraph.add_run(employee_text)
+                    run_employee.font.size = Pt(5)  # Мелкий шрифт для деталей
+                    run_employee.font.name = 'Times New Roman'
+
+            # Если это последняя строка таблицы, делаем её жирной
+            if row_idx == total_rows - 1:
                 for cell in row.cells:
-                    paragraph = cell.paragraphs[0]
-                    run = paragraph.runs[0]
-                    run.bold = True  # Делаем весь текст в строке жирным
+                    for paragraph in cell.paragraphs:
+                        for run in paragraph.runs:
+                            run.bold = True
 
             row_idx += 1
 
+        # Сохраняем результат в буфер
         buffer = BytesIO()
         doc.save(buffer)
         buffer.seek(0)

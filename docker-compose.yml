@@ -27,7 +27,7 @@ services:
         - "8009:8009"
     volumes:
       - .:/app
-      - /app/venv
+      - /app/.venv
     networks:
       - backend-dev
     depends_on:
