@@ -1,110 +1,88 @@
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta
+from typing import Optional
 
-from fastapi import HTTPException, status, Depends
-from fastapi_jwt_auth import AuthJWT
-from pydantic import EmailStr
-from sqlalchemy.orm import Session
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from fastapi import HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from core import configs
-from exceptions import BadRequestException
 from models import User
-from schemas import LoginForm, RegistrationForm, UserCreate
-from services import user_service
-
-from utils import hash_password, verify_password, is_valid_phone_number
+from schemas import TokenData
 
 
-class AuthService:
-
-    def login(self, form: LoginForm, db: Session, Authorize: AuthJWT):
-        user = user_service.get_by_email(db, EmailStr(form.email).lower())
-        if not user or not verify_password(form.password, user.password):
-            raise BadRequestException(detail="Incorrect email or password!")
-
-        self._set_last_signed_at(db, user)
-        access_token, refresh_token = self._generate_tokens(db, Authorize, user)
-        return {"access_token": access_token, "refresh_token": refresh_token}
-
-    def register(self, db: Session, form: RegistrationForm):
-        if user_service.get_by_email(db, EmailStr(form.email).lower()):
-            raise BadRequestException(
-                detail="Пользователь с таким Email-ом уже существует!"
-            )
-        if user_service.get_by_iin(db, form.iin):
-            raise BadRequestException(
-                detail="Пользователь с таким ИИН-ом уже существует!"
-            )
-        if not is_valid_phone_number(form.phone_number):
-            raise BadRequestException(
-                detail="Неправильно ввели телефонный номер! Попробуйте через +7"
-            )
-        if form.password != form.re_password:
-            raise BadRequestException(detail="Ваши пороли не совпадают!")
-
-        user_obj_in = UserCreate(
-            email=EmailStr(form.email).lower(),
-            name=form.name,
-            password=hash_password(form.password),
-        )
-        print(user_obj_in, "user_obj_in")
-        user = user_service.create(db=db, obj_in=user_obj_in)
-        print(user)
-        return user
-
-    def refresh_token(self, db: Session, Authorize: AuthJWT):
-        if not Authorize.get_jwt_subject():
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Could not refresh access token",
-            )
-        user = user_service.get(db, Authorize.get_jwt_subject())
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="The user belonging to this token no longer exist",
-            )
-
-        access_token, refresh_token = self._generate_tokens(db, Authorize, user)
-
-        return {"access_token": access_token, "refresh_token": refresh_token}
-
-    def _generate_tokens(self, db: Session, Authorize: AuthJWT, user: User):
-
-        # Определение дополнительных утверждений для токена
-        user_claims = {
-            "email": str(user.email),
-            "employee_id": str(user.employee_id) if user.employee_id else "",
-        }
-
-        # Создание токена доступа
-        access_token = Authorize.create_access_token(
-            subject=str(user.id),
-            user_claims=user_claims,
-            expires_time=timedelta(minutes=configs.ACCESS_TOKEN_EXPIRES_IN),
-        )
-
-        # Создание токена обновления
-        refresh_token = Authorize.create_refresh_token(
-            subject=str(user.id),
-            user_claims=user_claims,
-            expires_time=timedelta(minutes=configs.REFRESH_TOKEN_EXPIRES_IN),
-        )
-
-        return access_token, refresh_token
-
-    def _set_last_signed_at(self, db: Session, user: User):
-        user.last_signed_at = datetime.now()
-
-        db.add(user)
-        db.flush()
-
-    # Зависимость для аутентификации и получения данных пользователя
-    def get_current_user(self, Authorize: AuthJWT = Depends()):
-        Authorize.jwt_required()
-        user_id = Authorize.get_jwt_subject()
-        user_email = Authorize.get_raw_jwt()["email"]
-        print(user_email)
-        return {"user_id": user_id, "user_email": user_email}
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-auth_service = AuthService()
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """
+    Проверяет, что открытый пароль соответствует сохранённому хэшу.
+    """
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def get_password_hash(password: str) -> str:
+    """
+    Генерирует bcrypt-хэш для строки-пароля.
+    """
+    return pwd_context.hash(password)
+
+
+async def get_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
+    """
+    Возвращает User из БД по email, либо None.
+    """
+    result = await db.execute(select(User).where(User.email == email))
+    return result.scalars().first()
+
+
+async def authenticate_user(db: AsyncSession, email: str, password: str) -> Optional[User]:
+    """
+    Если в БД есть пользователь с этим email и пароль верный — возвращает User,
+    иначе — None.
+    :rtype: Optional[User]
+    """
+    user = await get_user_by_email(db, email)
+    if not user:
+        return None
+    if not verify_password(password, user.password):
+        return None
+    return user
+
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    """
+    Создаёт JWT с полем "sub" = email и полем "exp" = время истечения.
+    """
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=15))
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, configs.SECRET_KEY, algorithm=configs.ALGORITHM)
+    return encoded_jwt
+
+
+async def get_current_user(token: str, db: AsyncSession) -> User:
+    """
+    Раскодирует токен, берёт из payload поле "sub" (email), проверяет,
+    что пользователь существует, и возвращает объект User.
+    Если токен просрочен или пользователь не найден — бросает HTTPException(401).
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, configs.SECRET_KEY, algorithms=[configs.ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+        token_data = TokenData(email=email)
+    except JWTError:
+        raise credentials_exception
+
+    user = await get_user_by_email(db, token_data.email)
+    if user is None:
+        raise credentials_exception
+    return user

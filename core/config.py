@@ -1,4 +1,5 @@
-from pydantic import BaseSettings, Extra
+from pydantic import Extra
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -14,11 +15,11 @@ class Settings(BaseSettings):
     POSTGRES_HOST: str
     POSTGRES_HOSTNAME: str
 
-    AUTHJWT_SECRET_KEY: str
+    SECRET_KEY: str
 
     REFRESH_TOKEN_EXPIRES_IN: int
     ACCESS_TOKEN_EXPIRES_IN: int
-    JWT_ALGORITHM: str
+    ALGORITHM: str
 
     DEBUG: bool = True
     SENTRY_DSN: str = None

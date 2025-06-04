@@ -15,7 +15,6 @@ router = APIRouter(prefix="/positions", tags=["Positions"], dependencies=[Depend
 
 @router.get(
     "",
-    dependencies=[Depends(HTTPBearer())],
     response_model=List[PositionRead],
     summary="Все должностя",
 )
@@ -35,7 +34,6 @@ async def get_all(
 
 @router.post(
     "",
-    dependencies=[Depends(HTTPBearer())],
     status_code=status.HTTP_201_CREATED,
     response_model=PositionRead,
     summary="Create Position",
@@ -56,7 +54,6 @@ async def create(
 
 @router.get(
     "/{id}/",
-    dependencies=[Depends(HTTPBearer())],
     response_model=PositionRead,
     summary="Get Position by id",
 )
@@ -76,7 +73,6 @@ async def get_by_id(
 
 @router.put(
     "/{id}/",
-    dependencies=[Depends(HTTPBearer())],
     response_model=PositionRead,
     summary="Update Position",
 )
@@ -98,7 +94,6 @@ async def update(
 
 @router.delete(
     "/{id}/",
-    dependencies=[Depends(HTTPBearer())],
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete Position",
 )

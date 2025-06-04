@@ -5,7 +5,7 @@ from typing import List
 import aiofiles
 from fastapi import APIRouter, Depends, status, UploadFile, HTTPException
 from fastapi.security import HTTPBearer
-from fastapi_jwt_auth import AuthJWT
+
 
 from sqlalchemy.orm import Session
 import pandas as pd
@@ -22,7 +22,6 @@ router = APIRouter(prefix="/employees", tags=["Employees"], dependencies=[Depend
 
 @router.get(
     "",
-    dependencies=[Depends(HTTPBearer())],
     response_model=List[EmployeeRead],
     summary="Get all Employees",
 )
@@ -42,7 +41,6 @@ async def get_all(
 
 @router.post(
     "",
-    dependencies=[Depends(HTTPBearer())],
     status_code=status.HTTP_201_CREATED,
     response_model=EmployeeRead,
     summary="Create Position",
@@ -63,7 +61,6 @@ async def create(
 
 @router.get(
     "/{id}/",
-    dependencies=[Depends(HTTPBearer())],
     response_model=EmployeeRead,
     summary="Get Employee by id",
 )
@@ -83,7 +80,6 @@ async def get_by_id(
 
 @router.put(
     "/{id}/",
-    dependencies=[Depends(HTTPBearer())],
     response_model=EmployeeRead,
     summary="Update Employee",
 )
@@ -105,7 +101,6 @@ async def update(
 
 @router.delete(
     "/{id}/",
-    dependencies=[Depends(HTTPBearer())],
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete Employee",
 )
@@ -125,7 +120,6 @@ async def delete(
 
 @router.get(
     "",
-    dependencies=[Depends(HTTPBearer())],
     response_model=List[EmployeeRead],
     summary="Get all Employees",
 )
@@ -241,14 +235,14 @@ async def upload_excel(file: UploadFile, directory: str, db: Session = Depends(g
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing file: {e}")
 
-@router.post(
-    "/bulk/upload/photos/for/employee/states/",
-    summary="Bulk update Employee's photos for employee states"
-    )
-async def upload_photos_to_employees(*, directory: str, db: Session = Depends(get_db), Authorize: AuthJWT = Depends()):
-    Authorize.jwt_required()
-    user_id = Authorize.get_jwt_subject()
-    return await employee_service.upload_photos_to_employees(db, directory, user_id)
+# @router.post(
+#     "/bulk/upload/photos/for/employee/states/",
+#     summary="Bulk update Employee's photos for employee states"
+#     )
+# async def upload_photos_to_employees(*, directory: str, db: Session = Depends(get_db)):
+#     Authorize.jwt_required()
+#     user_id = Authorize.get_jwt_subject()
+#     return await employee_service.upload_photos_to_employees(db, directory, user_id)
 
 
 @router.post(
@@ -262,9 +256,7 @@ async def add_new_status(
         employee_id: int,
         new_status_data: StatusUpdate,  # Принимаем JSON
         db: Session = Depends(get_db),
-        Authorize: AuthJWT = Depends()
 ):
-    Authorize.jwt_required()
     return await employee_service.assign_new_status(db, employee_id, new_status_data)
 
 
@@ -272,6 +264,5 @@ async def add_new_status(
     "/update/statuses/",
     summary="Update Employee's statuses"
     )
-async def update_employees_statuses(*, db: Session = Depends(get_db), Authorize: AuthJWT = Depends()):
-    Authorize.jwt_required()
+async def update_employees_statuses(*, db: Session = Depends(get_db)):
     return await employee_service.update_employees_statuses(db)

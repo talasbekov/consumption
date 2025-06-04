@@ -15,7 +15,6 @@ router = APIRouter(prefix="/ranks", tags=["Ranks"], dependencies=[Depends(HTTPBe
 
 @router.get(
     "",
-    dependencies=[Depends(HTTPBearer())],
     response_model=List[RankRead],
     summary="Звания",
 )

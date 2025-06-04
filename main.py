@@ -8,17 +8,12 @@ from fastapi.logger import logger as log
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi_jwt_auth import AuthJWT
-from fastapi_jwt_auth.exceptions import AuthJWTException, JWTDecodeError
 from fastapi.openapi.docs import get_swagger_ui_html
 from pydantic import ValidationError
 
 from api import router
 from core import configs
-from services import auth_service
-
-# from ws import notification_manager
-
+from services import get_current_user
 
 # Настройка логирования
 logg = logging.getLogger(__name__)
@@ -42,18 +37,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# sqlalchemy
-# app.add_middleware(
-#     DebugToolbarMiddleware,
-#     panels=[
-#         "debug_toolbar.panels.versions.VersionsPanel",
-#         "debug_toolbar.panels.timer.TimerPanel",
-#         "debug_toolbar.panels.settings.SettingsPanel",
-#         "debug_toolbar.panels.headers.HeadersPanel",
-#         "debug_toolbar.panels.request.RequestPanel",
-#         "debug_toolbar.panels.sqlalchemy.SQLAlchemyPanel",
-#     ],
-# )
 
 app.include_router(router)
 
@@ -63,7 +46,6 @@ app.mount("/media", StaticFiles(directory="media"), name="media")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-@AuthJWT.load_config
 def get_config():
     return configs
 
@@ -82,7 +64,7 @@ async def add_process_time_header(request: Request, call_next):
         try:
             # Имитация получения данных пользователя
             user_data = (
-                auth_service.get_current_user()
+                get_current_user()
             )  # Здесь предполагается синхронный вызов для примера
             # В реальности может потребоваться асинхронный вызов с await
             # Добавляем данные пользователя в контекст шаблона
@@ -102,17 +84,6 @@ async def add_process_time_header(request: Request, call_next):
 def validation_error_handler(request: Request, exc: ValidationError):
     return JSONResponse(status_code=400, content={"detail": exc.json()})
 
-
-@app.exception_handler(JWTDecodeError)
-def jwt_decode_error_handler(request: Request, exc: JWTDecodeError):
-    return JSONResponse(status_code=401, content={"detail": exc.message})
-
-
-@app.exception_handler(AuthJWTException)
-def authjwt_exception_handler(request: Request, exc: AuthJWTException):
-    return JSONResponse(status_code=exc.status_code, content={"detail": exc.message})
-
-
 @app.get("/", include_in_schema=False)
 async def docs_redirect():
     return RedirectResponse(url="/api/v1/auth2/login")
@@ -126,25 +97,3 @@ async def custom_swagger_ui_html():
         swagger_js_url="/static/swagger-ui/dist/swagger-ui-bundle.js",
         swagger_css_url="/static/swagger-ui/dist/swagger-ui.css",
     )
-
-
-# @app.websocket("/ws")
-# async def websocket_endpoint(
-#     websocket: WebSocket,
-#     token: str = Query(...),
-#     Authorize: AuthJWT = Depends(),
-# ):
-#     try:
-#         Authorize.jwt_required("websocket", token=token)
-#         user_id = Authorize.get_jwt_subject()
-#         if user_id is None:
-#             raise AuthJWTException()
-#     except AuthJWTException:
-#         await websocket.close()
-#
-#     await notification_manager.connect(websocket, user_id)
-#     try:
-#         while True:
-#             await websocket.receive_text()
-#     except WebSocketDisconnect:
-#         notification_manager.disconnect(user_id, websocket)

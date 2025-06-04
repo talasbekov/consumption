@@ -1,17 +1,24 @@
+from pydantic import BaseModel, EmailStr, constr
 from typing import Optional
-from pydantic import EmailStr
-
-from schemas import Model
 
 
-class LoginForm(Model):
+class RegistrationForm(BaseModel):
     email: EmailStr
-    password: str
+    password: constr(min_length=6)
 
 
-class RegistrationForm(Model):
+class Token(BaseModel):
+    access_token: str
+    token_type: str  # обычно "bearer"
+
+
+class TokenData(BaseModel):
+    email: Optional[str] = None
+
+
+class UserRead(BaseModel):
+    id: int
     email: EmailStr
-    name: Optional[str]
-    password: str
-    re_password: str
 
+    class Config:
+        orm_mode = True

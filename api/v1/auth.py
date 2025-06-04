@@ -1,57 +1,115 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPBearer
-from fastapi_jwt_auth import AuthJWT
-from sqlalchemy.orm import Session
+from datetime import timedelta
 
-from core import get_db
-from schemas import LoginForm, RegistrationForm
-from services import auth_service
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from core import get_db, configs
+from services import (
+    authenticate_user,
+    create_access_token,
+    get_current_user
+)
+from schemas import (
+    RegistrationForm,
+    Token,
+    UserRead
+)
+from models import User
 
 router = APIRouter(prefix="/auth", tags=["Authorization"])
 
 
-@router.post("/login", summary="Login")
-async def login(
-    form: LoginForm, db: Session = Depends(get_db), Authorize: AuthJWT = Depends()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+
+
+@router.post(
+    "/login",
+    response_model=Token,
+    summary="Login (получение JWT-токена)"
+)
+async def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: AsyncSession = Depends(get_db),
 ):
     """
-    Login to the system.
-
-    - **email**: required and should be a valid email format.
-    - **password**: required.
+    - Принимает form-data с полями username (email) и password.
+    - Если аутентификация успешна, возвращает {"access_token": <JWT>, "token_type": "bearer"}.
+    - Если нет — 401.
     """
-    return auth_service.login(form, db, Authorize)
-
-
-@router.post("/register", summary="Register")
-async def register(form: RegistrationForm, db: Session = Depends(get_db)):
-
-    return auth_service.register(form, db)
-
-
-# @router.post("/register/user", summary="Register User",
-#              dependencies=[Depends(HTTPBearer())])
-# async def register_candidate(form: UserRegistrationForm,
-#                              Authorize: AuthJWT = Depends(),
-#                              db: Session = Depends(get_db)):
-#     """
-#         Register new candidate to the system.
-#
-#         - **iin**: str
-#     """
-#     Authorize.jwt_required()
-#     role = Authorize.get_raw_jwt()['role']
-#     return auth_service.register_candidate(
-#         form=form, db=db, staff_unit_id=role)
-
-
-@router.get("/refresh", dependencies=[Depends(HTTPBearer())])
-def refresh_token(Authorize: AuthJWT = Depends(), db: Session = Depends(get_db)):
-    try:
-        Authorize.jwt_refresh_token_required()
-    except Exception:
+    user = await authenticate_user(db, form_data.username, form_data.password)
+    if not user:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
-    return auth_service.refresh_token(db, Authorize)
+    expires = timedelta(minutes=configs.ACCESS_TOKEN_EXPIRES_IN)
+    access_token = create_access_token(
+        data={"sub": user.email},
+        expires_delta=expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.post(
+    "/register",
+    response_model=UserRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Register (создание нового пользователя)"
+)
+async def register_user(
+    form: RegistrationForm,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    1. Проверяет, что email ещё не занят.
+    2. Хэширует пароль.
+    3. Сохраняет нового пользователя в БД.
+    4. Возвращает сериализованный UserRead (id + email).
+    """
+    # Проверяем, есть ли уже юзер с таким email
+    existing = await authenticate_user(db, form.email, form.password)
+    # Обратите внимание: здесь лучше сначала проверить get_user_by_email отдельно,
+    # чтобы не проверять пароль для существующего, но для простоты достаточно:
+    if existing or (await db.execute(
+            select(User).where(User.email == form.email)
+        )).scalars().first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email is already registered"
+        )
+
+    # Хэшируем пароль и создаём модель
+    from services import get_password_hash  # можно импортировать вверху
+    hashed_pwd = get_password_hash(form.password)
+
+    new_user = User(
+        email=form.email,
+        password=hashed_pwd,
+    )
+    db.add(new_user)
+    await db.flush()  # чтобы получить new_user.id
+
+    # Коммит произойдёт автоматически, потому что get_db() делает await session.commit()
+    return new_user
+
+
+@router.get(
+    "/me",
+    response_model=UserRead,
+    summary="Получить текущего пользователя"
+)
+async def read_users_me(
+    token: str = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    1. Взять token из заголовка Authorization: Bearer <token>.
+    2. Раскодировать и найти пользователя через get_current_user.
+    3. Вернуть его данные (UserRead).
+    """
+    user = await get_current_user(token, db)
+    return user

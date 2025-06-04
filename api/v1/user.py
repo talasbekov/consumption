@@ -1,107 +1,112 @@
+# app/api/v1/user.py
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
-from fastapi import APIRouter, Depends, status
-from fastapi_jwt_auth import AuthJWT
-from sqlalchemy.orm import Session
-
 from core import get_db
-
-from schemas import UserRead, UserUpdate, UserCreate
+from models import User
+from schemas import UserRead, UserCreate, UserUpdate
 from services import user_service
 
-router = APIRouter(
-    prefix="/users2", tags=["Users_V2"]
-)
+router = APIRouter(prefix="/api/v1/users2", tags=["users"])
 
 
 @router.get(
     "",
     response_model=List[UserRead],
-    summary="Get all Users",
+    summary="Получить всех пользователей (с пагинацией)"
 )
 async def get_all(
-    *,
-    db: Session = Depends(get_db),
     skip: int = 0,
     limit: int = 100,
-    Authorize: AuthJWT = Depends()
-):
+    db: AsyncSession = Depends(get_db)
+) -> List[User]:
     """
-    Get all Users
+    Возвращает список пользователей, начиная с отступа `skip` и длиной `limit`.
+    """
+    users = await user_service.get_multi(db, skip, limit)
+    return users
 
+
+@router.get(
+    "/{user_id}",
+    response_model=UserRead,
+    summary="Получить пользователя по ID"
+)
+async def get_one(
+    user_id: int,
+    db: AsyncSession = Depends(get_db)
+) -> User:
     """
-    Authorize.jwt_required()
-    return user_service.get_multi(db, skip, limit)
+    Возвращает одного пользователя по его ID.
+    Если не найден — 404.
+    """
+    user = await user_service.get(db, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    return user
 
 
 @router.post(
     "",
+    response_model=UserRead,
     status_code=status.HTTP_201_CREATED,
-    response_model=UserRead,
-    summary="Create User",
+    summary="Создать нового пользователя"
 )
-async def create(
-    *, db: Session = Depends(get_db), body: UserCreate
-):
+async def create_user(
+    payload: UserCreate,
+    db: AsyncSession = Depends(get_db)
+) -> User:
     """
-    Create User
-
-    - **name**: required
+    Создаёт нового пользователя по Pydantic-схеме UserCreate.
     """
-    return user_service.create(db, body)
-
-
-@router.get(
-    "/{id}/",
-    response_model=UserRead,
-    summary="Get User by id",
-)
-async def get_by_id(
-    *, db: Session = Depends(get_db), id: str, Authorize: AuthJWT = Depends()
-):
-    """
-    Get User by id
-
-    - **id**: UUID - required.
-    """
-    Authorize.jwt_required()
-    return user_service.get_by_id(db, str(id))
+    new_user = await user_service.create(db, payload)
+    return new_user
 
 
 @router.put(
-    "/{id}/",
+    "/{user_id}",
     response_model=UserRead,
-    summary="Update User",
+    summary="Обновить пользователя"
 )
-async def update(
-    *,
-    db: Session = Depends(get_db),
-    id: str,
-    body: UserUpdate,
-    Authorize: AuthJWT = Depends()
-):
+async def update_user(
+    user_id: int,
+    payload: UserUpdate,
+    db: AsyncSession = Depends(get_db)
+) -> User:
     """
-    Update User
-
+    Обновляет данные существующего пользователя. Если не найден — 404.
     """
-    Authorize.jwt_required()
-    return user_service.update(
-        db, db_obj=user_service.get_by_id(db, str(id)), obj_in=body
-    )
+    user = await user_service.get(db, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    updated_user = await user_service.update(db, user, payload)
+    return updated_user
 
 
 @router.delete(
-    "/{id}/",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete User",
+    "/{user_id}",
+    response_model=UserRead,
+    summary="Удалить пользователя"
 )
-async def delete(
-    *, db: Session = Depends(get_db), id: str, Authorize: AuthJWT = Depends()
-):
+async def delete_user(
+    user_id: int,
+    db: AsyncSession = Depends(get_db)
+) -> User:
     """
-    Delete User
-
-    - **id**: UUId - required
+    Удаляет пользователя. Если не найден — 404.
     """
-    Authorize.jwt_required()
-    user_service.remove(db, str(id))
+    user = await user_service.remove(db, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    return user

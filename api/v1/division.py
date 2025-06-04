@@ -1,48 +1,44 @@
+# app/api/v1/division.py
+
 from typing import List
 
 from fastapi import APIRouter, Depends, status
-from fastapi.security import HTTPBearer
-
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from core import get_db
-
 from schemas import DivisionRead, DivisionUpdate, DivisionCreate
 from services import division_service
 
-router = APIRouter(prefix="/divisions", tags=["Divisions"], dependencies=[Depends(HTTPBearer())])
+router = APIRouter(prefix="/api/v1/divisions", tags=["Divisions"])
 
 
 @router.get(
     "",
-    dependencies=[Depends(HTTPBearer())],
     response_model=List[DivisionRead],
     summary="Get all Divisions",
 )
 async def get_all(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     skip: int = 0,
     limit: int = 100,
 ):
     """
     Get all Divisions
-
     """
-
-    return division_service.get_multi(db, skip, limit)
+    divisions = await division_service.get_multi(db, skip, limit)
+    return divisions
 
 
 @router.post(
     "",
-    dependencies=[Depends(HTTPBearer())],
     status_code=status.HTTP_201_CREATED,
     response_model=DivisionRead,
-    summary="Create Position",
+    summary="Create Division",
 )
-async def create(
+async def create_division(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     body: DivisionCreate,
 ):
     """
@@ -50,19 +46,18 @@ async def create(
 
     - **name**: required
     """
-
-    return division_service.create(db, body)
+    new_division = await division_service.create(db, body)
+    return new_division
 
 
 @router.get(
     "/{id}/",
-    dependencies=[Depends(HTTPBearer())],
     response_model=DivisionRead,
     summary="Get Division by id",
 )
 async def get_by_id(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     id: str,
 ):
     """
@@ -70,60 +65,58 @@ async def get_by_id(
 
     - **id**: UUID - required.
     """
-
-    return division_service.get_by_id(db, str(id))
+    division = await division_service.get(db, id)
+    return division
 
 
 @router.put(
     "/{id}/",
-    dependencies=[Depends(HTTPBearer())],
     response_model=DivisionRead,
     summary="Update Division",
 )
-async def update(
+async def update_division(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     id: str,
     body: DivisionUpdate,
 ):
     """
     Update Division
-
     """
-
-    return division_service.update(
-        db, db_obj=division_service.get_by_id(db, str(id)), obj_in=body
-    )
+    db_obj = await division_service.get(db, id)
+    updated = await division_service.update(db, db_obj=db_obj, obj_in=body)
+    return updated
 
 
 @router.delete(
     "/{id}/",
-    dependencies=[Depends(HTTPBearer())],
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete Division",
 )
-async def delete(
+async def delete_division(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     id: str,
 ):
     """
     Delete Division
 
-    - **id**: UUId - required
+    - **id**: UUID - required
     """
-
-    division_service.remove(db, str(id))
+    await division_service.remove(db, id)
+    return None
 
 
 @router.get(
     "/department/directorate/count",
-    dependencies=[Depends(HTTPBearer())],
-    response_model=List[dict]
+    response_model=List[dict],
+    summary="Get employee count by directorate",
 )
-def get_employee_count_by_directorate(db: Session = Depends(get_db)):
+async def get_employee_count_by_directorate(
+    db: AsyncSession = Depends(get_db),
+):
     """
     Расход сотрудников всего департамента
     """
-    return division_service.get_count_state(db)
-
+    result = await division_service.get_count_state(db)
+    return result

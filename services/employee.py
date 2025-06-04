@@ -1,17 +1,13 @@
 import logging
 from datetime import date
 
-import aiofiles
-
 from models import (
-    Employee, State, Department, Management, Division, Status
+    Employee, Status
 )  # Предполагается, что у вас есть модель Employee в models.py
 from schemas import (
     EmployeeCreate,
-    EmployeeUpdate, StateRandomCreate, StatusUpdate,
+    EmployeeUpdate, StatusUpdate,
 )  # Предполагается, что у вас есть схемы создания и обновления событий
-
-from services import user_service, data_service, state_service
 
 from pathlib import Path
 from typing import List, Type
@@ -20,7 +16,7 @@ from fastapi import UploadFile, HTTPException
 from PIL import Image, ImageOps
 from io import BytesIO
 
-from sqlalchemy.orm import Session, joinedload, InstrumentedAttribute
+from sqlalchemy.orm import Session, InstrumentedAttribute
 
 from services.base import ServiceBase
 from schemas import EmployeeDataBulkUpdate
@@ -147,198 +143,198 @@ class EmployeeService(ServiceBase[Employee, EmployeeCreate, EmployeeUpdate]):
 
         return employees
 
-    async def get_employees_by_management(self, db: Session, user_id: int):
-        # Получаем пользователя
-        user = user_service.get_by_id(db, user_id)
-        print(user)
+    # async def get_employees_by_management(self, db: Session, user_id: int):
+    #     # Получаем пользователя
+    #     user = user_service.get_by_id(db, user_id)
+    #     print(user)
+    #
+    #     if not user:
+    #         raise HTTPException(status_code=404, detail="User not found")
+    #
+    #     # Получаем работодателя
+    #     employee = employee_service.get_by_id(db, user.employee_id)
+    #
+    #     if not employee:
+    #         raise HTTPException(status_code=404, detail="Employee not found")
+    #
+    #     # Получаем state для данного пользователя
+    #     state = db.query(State).filter(State.employee_id == user.employee_id).first()
+    #     print(state)
+    #
+    #     if not state:
+    #         raise HTTPException(status_code=404, detail="State not found for the employee")
+    #
+    #     # Получаем работодателей, относящихся к тому же управлению
+    #     employees = db.query(Employee).join(State).options(
+    #         joinedload(Employee.states)  # Это загружает связанные объекты сразу
+    #     ).filter(
+    #         State.management_id == state.management_id
+    #     ).all()
+    #
+    #     for emp in employees:
+    #         state_of_emp = state_service.get_by_employee_id(db, emp.id)
+    #         emp.position = state_of_emp.positions
+    #     print(employees)
+    #     # for emp in employees:
+    #     #     print(emp.states)
+    #     #     for st in emp.states:
+    #     #         print(st.id)
+    #
+    #     return employees
 
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        # Получаем работодателя
-        employee = employee_service.get_by_id(db, user.employee_id)
-
-        if not employee:
-            raise HTTPException(status_code=404, detail="Employee not found")
-
-        # Получаем state для данного пользователя
-        state = db.query(State).filter(State.employee_id == user.employee_id).first()
-        print(state)
-
-        if not state:
-            raise HTTPException(status_code=404, detail="State not found for the employee")
-
-        # Получаем работодателей, относящихся к тому же управлению
-        employees = db.query(Employee).join(State).options(
-            joinedload(Employee.states)  # Это загружает связанные объекты сразу
-        ).filter(
-            State.management_id == state.management_id
-        ).all()
-
-        for emp in employees:
-            state_of_emp = state_service.get_by_employee_id(db, emp.id)
-            emp.position = state_of_emp.positions
-        print(employees)
-        # for emp in employees:
-        #     print(emp.states)
-        #     for st in emp.states:
-        #         print(st.id)
-
-        return employees
-
-    async def create_employee_states(self, db: Session):
-        # Предзагрузка данных
-        employees = db.query(Employee).all()
-        department = db.query(Department).first()
-
-        if not department:
-            print("Отдел отсутствует. Завершение операции.")
-            return
-
-        managements = db.query(Management).filter(Management.department_id == department.id).all()
-        if not managements:
-            print("Управления отсутствуют. Завершение операции.")
-            return
-
-        management_count = len(managements)
-        if management_count == 0:
-            print("Нет доступных управлений для распределения сотрудников. Завершение.")
-            return
-
-        employee_index = 0  # Индекс для распределения сотрудников
-
-        for management in managements:
-            # Получаем подразделения для текущего управления
-            divisions = db.query(Division).filter(Division.management_id == management.id).all()
-
-            if divisions:
-                # Распределение сотрудников между подразделениями
-                for division in divisions:
-                    if employee_index >= len(employees):
-                        break
-
-                    # Выбираем сотрудника для текущего подразделения
-                    employee = employees[employee_index]
-                    employee_index += 1
-
-                    # Создаем данные для state
-                    state_data = StateRandomCreate(
-                        department_id=department.id,
-                        management_id=management.id,
-                        division_id=division.id,
-                        position_id=1,
-                        employee_id=employee.id
-                    )
-
-                    # Создаем запись state
-                    created_state = data_service.create_state(db, state_data)
-                    if created_state is None:
-                        print(
-                            f"Ошибка при создании state для сотрудника {employee.id} в подразделении {division.id}. Пропуск.")
-            else:
-                # Если управление не имеет подразделений, назначаем сотрудников напрямую
-                if employee_index >= len(employees):
-                    break
-
-                employee = employees[employee_index]
-                employee_index += 1
-
-                state_data = StateRandomCreate(
-                    department_id=department.id,
-                    management_id=management.id,
-                    division_id=None,  # Нет подразделения
-                    position_id=1,
-                    employee_id=employee.id
-                )
-
-                created_state = data_service.create_state(db, state_data)
-                if created_state is None:
-                    print(
-                        f"Ошибка при создании state для сотрудника {employee.id} в управлении {management.id}. Пропуск.")
-
-        # Проверка на оставшихся сотрудников
-        if employee_index < len(employees):
-            print(f"Не удалось распределить {len(employees) - employee_index} сотрудников.")
-
-        print("Распределение сотрудников завершено.")
-
-    async def upload_photos_to_employees(self, db: Session, directory: str, user_id: int):
-        """
-        Асинхронное обновление фотографий сотрудников на основе файлов из указанной директории.
-        """
-        # Получаем пользователя по ID
-        user = user_service.get_by_id(db, user_id)
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        # Проверяем state пользователя
-        state = db.query(State).filter(State.employee_id == user.employee_id).first()
-        if not state:
-            raise HTTPException(status_code=404, detail="State not found for the employee")
-
-        # Получаем список сотрудников по department_id
-        states = db.query(State).filter(State.department_id == state.department_id).all()
-        employee_list = [
-            employee_service.get_by_id(db, st.employee_id) for st in states if st.employee_id
-        ]
-
-        # Проверяем директорию
-        try:
-            photo_directory = Path(directory).resolve(strict=True)
-            if not photo_directory.exists() or not photo_directory.is_dir():
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Directory '{directory}' does not exist or is not a directory"
-                )
-        except Exception as e:
-            print(f"Ошибка проверки директории: {e}")
-            raise HTTPException(status_code=500, detail="Error accessing photo directory")
-
-        for employee in employee_list:
-            if not employee or not employee.iin:
-                print(f"Skipping invalid employee or missing IIN: {employee}")
-                continue
-
-            iin = employee.iin.strip()
-            photo_path = photo_directory / f"{iin}.JPG"
-            if not photo_path.exists():
-                print(f"Photo not found for IIN: {iin}")
-                continue
-
-            try:
-                # Асинхронное чтение файла
-                async with aiofiles.open(photo_path, 'rb') as file:
-                    file_contents = await file.read()
-
-                # Открываем и обрабатываем изображение
-                image = Image.open(BytesIO(file_contents))
-                print(f"Открыто изображение для IIN: {iin}, размер: {image.size}")
-
-                if image.mode == "RGBA":
-                    image = image.convert("RGB")
-                    print(f"Изображение для IIN {iin} конвертировано в RGB")
-
-                # Обрезка до соотношения 3:4
-                image = self.crop_to_aspect_ratio(image, 3, 4)
-                print(f"Изображение для IIN {iin} обрезано до соотношения 3:4")
-
-                # Сохранение обработанного изображения
-                processed_photo_path = photo_directory / f"{iin}.JPG"
-                image.save(processed_photo_path, format="JPEG", quality=85)
-                print(f"Фото сохранено для IIN: {iin} по пути: {processed_photo_path}")
-
-                # Обновление записи сотрудника
-                employee.photo = f"media/images/fotoforportal/{iin}.JPG"
-                db.add(employee)
-                db.commit()
-                print(f"Photo URL updated in DB for IIN: {iin}")
-
-            except Exception as e:
-                db.rollback()
-                print(f"Error processing photo for IIN {iin}: {e}")
-            finally:
-                # Освобождаем ресурсы, если это необходимо
-                image.close()
+    # async def create_employee_states(self, db: Session):
+    #     # Предзагрузка данных
+    #     employees = db.query(Employee).all()
+    #     department = db.query(Department).first()
+    #
+    #     if not department:
+    #         print("Отдел отсутствует. Завершение операции.")
+    #         return
+    #
+    #     managements = db.query(Management).filter(Management.department_id == department.id).all()
+    #     if not managements:
+    #         print("Управления отсутствуют. Завершение операции.")
+    #         return
+    #
+    #     management_count = len(managements)
+    #     if management_count == 0:
+    #         print("Нет доступных управлений для распределения сотрудников. Завершение.")
+    #         return
+    #
+    #     employee_index = 0  # Индекс для распределения сотрудников
+    #
+    #     for management in managements:
+    #         # Получаем подразделения для текущего управления
+    #         divisions = db.query(Division).filter(Division.management_id == management.id).all()
+    #
+    #         if divisions:
+    #             # Распределение сотрудников между подразделениями
+    #             for division in divisions:
+    #                 if employee_index >= len(employees):
+    #                     break
+    #
+    #                 # Выбираем сотрудника для текущего подразделения
+    #                 employee = employees[employee_index]
+    #                 employee_index += 1
+    #
+    #                 # Создаем данные для state
+    #                 state_data = StateRandomCreate(
+    #                     department_id=department.id,
+    #                     management_id=management.id,
+    #                     division_id=division.id,
+    #                     position_id=1,
+    #                     employee_id=employee.id
+    #                 )
+    #
+    #                 # Создаем запись state
+    #                 created_state = data_service.create_state(db, state_data)
+    #                 if created_state is None:
+    #                     print(
+    #                         f"Ошибка при создании state для сотрудника {employee.id} в подразделении {division.id}. Пропуск.")
+    #         else:
+    #             # Если управление не имеет подразделений, назначаем сотрудников напрямую
+    #             if employee_index >= len(employees):
+    #                 break
+    #
+    #             employee = employees[employee_index]
+    #             employee_index += 1
+    #
+    #             state_data = StateRandomCreate(
+    #                 department_id=department.id,
+    #                 management_id=management.id,
+    #                 division_id=None,  # Нет подразделения
+    #                 position_id=1,
+    #                 employee_id=employee.id
+    #             )
+    #
+    #             created_state = data_service.create_state(db, state_data)
+    #             if created_state is None:
+    #                 print(
+    #                     f"Ошибка при создании state для сотрудника {employee.id} в управлении {management.id}. Пропуск.")
+    #
+    #     # Проверка на оставшихся сотрудников
+    #     if employee_index < len(employees):
+    #         print(f"Не удалось распределить {len(employees) - employee_index} сотрудников.")
+    #
+    #     print("Распределение сотрудников завершено.")
+    #
+    # async def upload_photos_to_employees(self, db: Session, directory: str, user_id: int):
+    #     """
+    #     Асинхронное обновление фотографий сотрудников на основе файлов из указанной директории.
+    #     """
+    #     # Получаем пользователя по ID
+    #     user = user_service.get_by_id(db, user_id)
+    #     if not user:
+    #         raise HTTPException(status_code=404, detail="User not found")
+    #
+    #     # Проверяем state пользователя
+    #     state = db.query(State).filter(State.employee_id == user.employee_id).first()
+    #     if not state:
+    #         raise HTTPException(status_code=404, detail="State not found for the employee")
+    #
+    #     # Получаем список сотрудников по department_id
+    #     states = db.query(State).filter(State.department_id == state.department_id).all()
+    #     employee_list = [
+    #         employee_service.get_by_id(db, st.employee_id) for st in states if st.employee_id
+    #     ]
+    #
+    #     # Проверяем директорию
+    #     try:
+    #         photo_directory = Path(directory).resolve(strict=True)
+    #         if not photo_directory.exists() or not photo_directory.is_dir():
+    #             raise HTTPException(
+    #                 status_code=400,
+    #                 detail=f"Directory '{directory}' does not exist or is not a directory"
+    #             )
+    #     except Exception as e:
+    #         print(f"Ошибка проверки директории: {e}")
+    #         raise HTTPException(status_code=500, detail="Error accessing photo directory")
+    #
+    #     for employee in employee_list:
+    #         if not employee or not employee.iin:
+    #             print(f"Skipping invalid employee or missing IIN: {employee}")
+    #             continue
+    #
+    #         iin = employee.iin.strip()
+    #         photo_path = photo_directory / f"{iin}.JPG"
+    #         if not photo_path.exists():
+    #             print(f"Photo not found for IIN: {iin}")
+    #             continue
+    #
+    #         try:
+    #             # Асинхронное чтение файла
+    #             async with aiofiles.open(photo_path, 'rb') as file:
+    #                 file_contents = await file.read()
+    #
+    #             # Открываем и обрабатываем изображение
+    #             image = Image.open(BytesIO(file_contents))
+    #             print(f"Открыто изображение для IIN: {iin}, размер: {image.size}")
+    #
+    #             if image.mode == "RGBA":
+    #                 image = image.convert("RGB")
+    #                 print(f"Изображение для IIN {iin} конвертировано в RGB")
+    #
+    #             # Обрезка до соотношения 3:4
+    #             image = self.crop_to_aspect_ratio(image, 3, 4)
+    #             print(f"Изображение для IIN {iin} обрезано до соотношения 3:4")
+    #
+    #             # Сохранение обработанного изображения
+    #             processed_photo_path = photo_directory / f"{iin}.JPG"
+    #             image.save(processed_photo_path, format="JPEG", quality=85)
+    #             print(f"Фото сохранено для IIN: {iin} по пути: {processed_photo_path}")
+    #
+    #             # Обновление записи сотрудника
+    #             employee.photo = f"media/images/fotoforportal/{iin}.JPG"
+    #             db.add(employee)
+    #             db.commit()
+    #             print(f"Photo URL updated in DB for IIN: {iin}")
+    #
+    #         except Exception as e:
+    #             db.rollback()
+    #             print(f"Error processing photo for IIN {iin}: {e}")
+    #         finally:
+    #             # Освобождаем ресурсы, если это необходимо
+    #             image.close()
 
     async def assign_new_status(self, db: Session, employee_id: int, new_status_data: StatusUpdate):
         """
