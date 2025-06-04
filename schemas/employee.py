@@ -1,6 +1,6 @@
 from typing import Optional, Text, List
 
-from schemas import Model, DivisionRead, RankRead
+from schemas import Model, DivisionRead, RankRead, NamedModel
 from schemas.employee_status import EmployeeStatusUpdate, EmployeeStatusRead
 
 
@@ -44,7 +44,9 @@ class EmployeeStateRead(Model):
     note: Optional[Text]
     photo: Optional[str]
     statuses: Optional[List[EmployeeStatusRead]]  # Связанные статусы сотрудника
+    division: Optional[DivisionRead]
     ranks: Optional[RankRead]
+    position: Optional[NamedModel]
 
     class Config:
         orm_mode = True

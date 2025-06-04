@@ -11,7 +11,7 @@ from schemas import (
     EmployeeUpdate, StateRandomCreate, StatusUpdate,
 )  # Предполагается, что у вас есть схемы создания и обновления событий
 
-from services import user_service, data_service
+from services import user_service, data_service, state_service
 
 from pathlib import Path
 from typing import List, Type
@@ -174,11 +174,15 @@ class EmployeeService(ServiceBase[Employee, EmployeeCreate, EmployeeUpdate]):
         ).filter(
             State.management_id == state.management_id
         ).all()
-        print(employees)
+
         for emp in employees:
-            print(emp.states)
-            for st in emp.states:
-                print(st.id)
+            state_of_emp = state_service.get_by_employee_id(db, emp.id)
+            emp.position = state_of_emp.positions
+        print(employees)
+        # for emp in employees:
+        #     print(emp.states)
+        #     for st in emp.states:
+        #         print(st.id)
 
         return employees
 

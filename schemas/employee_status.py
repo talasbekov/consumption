@@ -6,7 +6,7 @@ from schemas import Model, StatusRead
 class EmployeeStatusBase(Model):
     employee_id: int
     status_id: int
-    start_date: date
+    start_date: Optional[date]
     end_date: Optional[date]
     note: Optional[str]
 

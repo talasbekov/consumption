@@ -13,7 +13,6 @@ from schemas import DepartmentCreate, ManagementCreate, DivisionCreate, Position
 from faker import Faker
 import random
 
-# from services import employee_service
 
 fake = Faker()
 
@@ -487,58 +486,111 @@ class DataForService:
             if created_state is None:
                 print("Ошибка при создании state, пропуск итерации.")
 
+
     async def upload_photos_from_directory(self, directory: str, db: Session):
         # Проверяем, существует ли директория
         photo_directory = Path(directory)
         if not photo_directory.exists() or not photo_directory.is_dir():
             raise HTTPException(status_code=400, detail=f"Directory '{directory}' does not exist or is not a directory")
 
-        # Обрабатываем каждый файл в директории
-        for photo_path in photo_directory.iterdir():
-            if photo_path.is_file() and photo_path.suffix in [".jpg", ".png"]:
-                try:
-                    # Извлекаем id работодателя из названия файла
-                    employee_id = int(photo_path.stem.split('_')[0])  # Получаем всё, что до символа '_'
+        # Получаем список файлов с фотографиями
+        photo_files = [p for p in photo_directory.iterdir() if
+                       p.is_file() and p.suffix.lower() in [".jpg", ".png", ".jpeg"]]
+        if not photo_files:
+            raise HTTPException(status_code=400, detail="No valid photo files found in the directory.")
 
-                    # Ищем работодателя по id
-                    employee = db.query(Employee).filter(Employee.id == employee_id).first()
-                    if not employee:
-                        print(f"Работодатель с id {employee_id} не найден")
-                        continue
+        # Очищаем колонку photo у всех сотрудников
+        db.query(Employee).update({Employee.photo: None})
+        db.commit()
 
-                    # Используем aiofiles для асинхронного чтения файлов
-                    async with aiofiles.open(photo_path, 'rb') as file:
-                        file_contents = await file.read()
+        # Получаем список всех сотрудников
+        employees = db.query(Employee).all()
 
-                    # Открываем и проверяем изображение через PIL
-                    image = Image.open(BytesIO(file_contents))
+        for employee in employees:
+            # Выбираем случайное фото из списка
+            random_photo = random.choice(photo_files)
+            try:
+                # Асинхронно читаем содержимое файла
+                async with aiofiles.open(random_photo, 'rb') as file:
+                    file_contents = await file.read()
 
-                    # Если изображение в формате RGBA, преобразуем его в RGB
-                    if image.mode == "RGBA":
-                        image = image.convert("RGB")
-                    print(photo_path.name, "qazaq")
+                # Открываем изображение через PIL
+                image = Image.open(BytesIO(file_contents))
+                # Если изображение в формате RGBA, преобразуем его в RGB
+                if image.mode == "RGBA":
+                    image = image.convert("RGB")
 
-                    # # Обрезка изображения до соотношения сторон 3x4
-                    # image = employee_service.crop_to_aspect_ratio(image, 3, 4)
+                # image = employee_service.crop_to_aspect_ratio(image, 3, 4)
 
-                    # Путь для сохранения изображения
-                    save_path = Path(f"media/images/employee_photos/{employee.id}_{employee.surname}.jpg")
-                    save_path.parent.mkdir(parents=True, exist_ok=True)
+                # Путь для сохранения изображения
+                save_path = Path(f"media/images/employee_photos/{employee.id}_{employee.surname}.jpg")
+                save_path.parent.mkdir(parents=True, exist_ok=True)
+                image.save(save_path)
 
-                    # Сохраняем изображение (синхронно, т.к. PIL не поддерживает асинхронность)
-                    image.save(save_path)
-
-                    # Обновляем запись в БД
-                    employee.photo = str(save_path)
-                    db.add(employee)
-                except ValueError:
-                    print(f"Не удалось извлечь id работодателя из имени файла {photo_path.name}")
-                    continue
+                # Обновляем запись в БД
+                employee.photo = str(save_path)
+                db.add(employee)
+            except Exception as e:
+                print(f"Ошибка при обработке файла {random_photo.name} для сотрудника {employee.id}: {e}")
+                continue
 
         # Сохраняем изменения в БД
         db.commit()
 
         return {"message": "Photos uploaded successfully"}
+
+    # async def upload_photos_from_directory(self, directory: str, db: Session):
+    #     # Проверяем, существует ли директория
+    #     photo_directory = Path(directory)
+    #     if not photo_directory.exists() or not photo_directory.is_dir():
+    #         raise HTTPException(status_code=400, detail=f"Directory '{directory}' does not exist or is not a directory")
+    #
+    #     # Обрабатываем каждый файл в директории
+    #     for photo_path in photo_directory.iterdir():
+    #         if photo_path.is_file() and photo_path.suffix in [".jpg", ".png", ".jpeg"]:
+    #             try:
+    #                 # Извлекаем id работодателя из названия файла
+    #                 employee_id = int(photo_path.stem.split('_')[0])  # Получаем всё, что до символа '_'
+    #
+    #                 # Ищем работодателя по id
+    #                 employee = db.query(Employee).filter(Employee.id == employee_id).first()
+    #                 if not employee:
+    #                     print(f"Работодатель с id {employee_id} не найден")
+    #                     continue
+    #
+    #                 # Используем aiofiles для асинхронного чтения файлов
+    #                 async with aiofiles.open(photo_path, 'rb') as file:
+    #                     file_contents = await file.read()
+    #
+    #                 # Открываем и проверяем изображение через PIL
+    #                 image = Image.open(BytesIO(file_contents))
+    #
+    #                 # Если изображение в формате RGBA, преобразуем его в RGB
+    #                 if image.mode == "RGBA":
+    #                     image = image.convert("RGB")
+    #                 print(photo_path.name, "qazaq")
+    #
+    #                 # # Обрезка изображения до соотношения сторон 3x4
+    #                 # image = employee_service.crop_to_aspect_ratio(image, 3, 4)
+    #
+    #                 # Путь для сохранения изображения
+    #                 save_path = Path(f"media/images/employee_photos/{employee.id}_{employee.surname}.jpg")
+    #                 save_path.parent.mkdir(parents=True, exist_ok=True)
+    #
+    #                 # Сохраняем изображение (синхронно, т.к. PIL не поддерживает асинхронность)
+    #                 image.save(save_path)
+    #
+    #                 # Обновляем запись в БД
+    #                 employee.photo = str(save_path)
+    #                 db.add(employee)
+    #             except ValueError:
+    #                 print(f"Не удалось извлечь id работодателя из имени файла {photo_path.name}")
+    #                 continue
+    #
+    #     # Сохраняем изменения в БД
+    #     db.commit()
+    #
+    #     return {"message": "Photos uploaded successfully"}
 
 
 data_service = DataForService()

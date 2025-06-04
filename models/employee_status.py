@@ -10,7 +10,7 @@ class EmployeeStatus(Model):
     employee_id = Column(Integer, ForeignKey("employees.id"))
     status_id = Column(Integer, ForeignKey("statuses.id"))
 
-    start_date = Column(Date, nullable=False)
+    start_date = Column(Date, nullable=True)
     end_date = Column(Date, nullable=True)
 
     note = Column(Text, nullable=True)

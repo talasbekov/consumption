@@ -28,6 +28,15 @@ class NamedModel(Model):
         orm_mode = True
 
 
+class TitleModel(Model):
+    titleRU: Optional[str]
+    titleKZ: Optional[str]
+    titleEN: Optional[str]
+
+    class Config:
+        orm_mode = True
+
+
 class TextModel(Model):
     text: str
     textKZ: Optional[str]

@@ -70,7 +70,7 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
                 if employee_data.note is not None:
                     employee.note = employee_data.note
 
-                # for chatgpt
+                
                 employee_status = db.query(EmployeeStatus).filter(
                     EmployeeStatus.employee_id == employee_data.employee_id).first()
 
@@ -80,8 +80,8 @@ class StateService(ServiceBase[State, StateCreate, StateUpdate]):
                         employee_id=employee_data.employee_id,
                         status_id=employee_data.statuses.status_id,
                         start_date=employee_data.statuses.start_date,
-                        end_date=employee_data.statuses.end_date,
-                        note=employee_data.statuses.note if employee_data.statuses.note else "",
+                        end_date=employee_data.statuses.end_date if employee_data.statuses.end_date is not None else None,
+                        note=employee_data.statuses.note if employee_data.statuses.note is not None else None,
                     )
                     db.add(emp_status)
                 else:

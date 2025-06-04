@@ -1,7 +1,7 @@
 import datetime
 
 from sqlalchemy import TIMESTAMP, Column, String, text, CLOB, Integer
-from sqlalchemy.sql.sqltypes import Boolean
+from sqlalchemy.sql.sqltypes import Boolean, Text
 from abc import abstractmethod
 
 from core import Base
@@ -69,8 +69,12 @@ class NamedModel(Model):
 """
 
 
-class NestedModel(Model):
+class TitledModel(Model):
     __abstract__ = True
+
+    titleRU = Column("titleru", Text, nullable=True)
+    titleKZ = Column("titlekz", Text, nullable=True)
+    titleEN = Column("titleen", Text, nullable=True)
 
 
 """

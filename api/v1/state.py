@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from typing import List
 
 from fastapi import APIRouter, Depends, status, UploadFile, File, Form, HTTPException, Response, Body
@@ -267,17 +268,27 @@ def download_word_report(db: Session = Depends(get_db), Authorize: AuthJWT = Dep
     # Создаем Word документ
     word_file = state_service.create_word_report_from_template(db, user_id)
 
-    # Безопасное кодирование имени файла
-    filename = "расход.docx"
-    filename_encoded = quote(filename.encode('utf-8'))  # Кодируем в UTF-8
+    # Формируем имя файла с текущей датой
+    current_date = datetime.now().strftime("%d.%m.%Y")
+    filename = f"расход-{current_date}.docx"
+    filename_encoded = quote(filename.encode('utf-8'))  # Результат будет содержать только ASCII символы
 
-    # Отправляем документ с заголовком, который поддерживает не-ASCII символы
+    # Фолбэк-имя в ASCII. Можно использовать транслитерацию, например:
+    # fallback_filename = unidecode(filename)
+    # Или задать вручную:
+    fallback_filename = f"report-{current_date}.docx"
+
+    # Передаем оба параметра: fallback для клиентов, не поддерживающих UTF-8, и оригинальное имя
+    headers = {
+        "Content-Disposition": (
+                f"attachment; filename={fallback_filename}; filename*=UTF-8''{filename_encoded}"
+        )
+    }
+
     return Response(
         content=word_file.read(),
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={
-            "Content-Disposition": f'attachment; filename*=UTF-8\'\'{filename_encoded}'
-        }
+        headers=headers
     )
 
 

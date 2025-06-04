@@ -9,20 +9,19 @@ class Employee(Model):
     surname = Column(String(128))
     firstname = Column(String(128))
     patronymic = Column(String(128))
-    iin = Column(String, nullable=True)
+    iin = Column(String, nullable=True, index=True)
     sort = Column(Integer, nullable=False)
     photo = Column(String, nullable=True)
     note = Column(Text, nullable=True)
 
     rank_id = Column(Integer, ForeignKey("ranks.id"))
-    division_id = Column(Integer, ForeignKey("divisions.id"), nullable=True)
-    management_id = Column(Integer, ForeignKey("managements.id"), nullable=True)
+    division_id = Column(Integer, ForeignKey("divisions.id"), nullable=False)
+    position_id = Column(Integer, ForeignKey("positions.id"), nullable=False)
 
-    management = relationship("Management", back_populates="employees", lazy="select")
-    division = relationship("Division", back_populates="employees", lazy="select")
-    states = relationship("State", back_populates="employees", lazy="joined")  # Используем lazy="joined", чтобы всегда делать JOIN
-    ranks = relationship("Rank", back_populates="employees", lazy="select")
+    ranks = relationship("Rank", back_populates="employees")
+    divisions = relationship("Division", back_populates="employees")
+    position = relationship("Position", back_populates="employee")
     # Связь с промежуточной таблицей EmployeeStatus
     statuses = relationship("EmployeeStatus", back_populates="employee")
-    users = relationship("User", back_populates="employees", lazy="select")
+    users = relationship("User", back_populates="employees")
 
