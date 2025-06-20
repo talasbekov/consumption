@@ -14,7 +14,8 @@ from PIL import Image
 from core import get_db
 from models import Employee
 # from models import Employee
-from schemas import EmployeeRead, EmployeeUpdate, EmployeeCreate, StatusUpdate
+from schemas import EmployeeRead, EmployeeUpdate, EmployeeCreate, StatusUpdate # StatusUpdate will be removed from this endpoint
+from schemas.employee_status import EmployeeStatusCreate, EmployeeStatusRead # Added imports
 from services import employee_service
 
 router = APIRouter(prefix="/employees", tags=["Employees"], dependencies=[Depends(HTTPBearer())])
@@ -247,17 +248,18 @@ async def upload_excel(file: UploadFile, directory: str, db: Session = Depends(g
 
 @router.post(
     "/add/status/",
-    response_model=StatusUpdate,
-    summary="Add Employee's statuses",
+    response_model=EmployeeStatusRead, # Changed response model
+    summary="Assign a status period to an employee", # Updated summary
     dependencies=[Depends(HTTPBearer())]
     )
-async def add_new_status(
+async def assign_employee_status_endpoint( # Renamed function for clarity
         *,
-        employee_id: int,
-        new_status_data: StatusUpdate,  # Принимаем JSON
+        # employee_id: int, # Removed query parameter, employee_id is in EmployeeStatusCreate
+        new_status_data: EmployeeStatusCreate,  # Changed request body type
         db: Session = Depends(get_db),
 ):
-    return await employee_service.assign_new_status(db, employee_id, new_status_data)
+    # Service method is synchronous, removed await
+    return employee_service.assign_employee_status(db=db, data=new_status_data)
 
 
 @router.post(

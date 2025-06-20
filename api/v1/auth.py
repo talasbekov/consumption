@@ -16,7 +16,8 @@ from schemas import (
     Token,
     UserRead
 )
-from models import User
+from models import User, Employee # Added Employee import
+from sqlalchemy import select # Added select import
 
 router = APIRouter(prefix="/auth", tags=["Authorization"])
 
@@ -46,9 +47,26 @@ async def login_for_access_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Attempt to fetch the associated Employee record
+    employee = None
+    if user.employee_id:
+        employee_result = await db.execute(select(Employee).filter(Employee.id == user.employee_id))
+        employee = employee_result.scalars().first()
+
+    employee_division_id = employee.division_id if employee else None
+    # Default to Role 4 for now, this is a temporary default
+    user_role = user.role if user.role is not None else 4
+
+    token_data_payload = {
+        "sub": user.email,  # Standard subject claim
+        "user_id": user.id,
+        "role": user_role,
+        "division_id": employee_division_id,
+    }
+
     expires = timedelta(minutes=configs.ACCESS_TOKEN_EXPIRES_IN)
     access_token = create_access_token(
-        data={"sub": user.email},
+        data=token_data_payload, # Pass the new payload
         expires_delta=expires
     )
     return {"access_token": access_token, "token_type": "bearer"}

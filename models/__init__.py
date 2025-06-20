@@ -6,6 +6,4 @@ from .employee import Employee
 from .status import Status
 from .user import User
 from .employee_status import EmployeeStatus
-
-
-
+from .secondment import SecondmentLog, SecondmentStatusEnum # Added import
