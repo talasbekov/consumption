@@ -14,10 +14,13 @@ from services import (
 from schemas import (
     RegistrationForm,
     Token,
-    UserRead
+    UserRead,
+    TokenData # Added TokenData import for the new function
 )
-from models import User, Employee # Added Employee import
-from sqlalchemy import select # Added select import
+from models import User, Employee
+from sqlalchemy import select
+from typing import Optional # Added Optional for type hints
+from jose import JWTError, jwt # Added for new function
 
 router = APIRouter(prefix="/auth", tags=["Authorization"])
 
@@ -131,3 +134,31 @@ async def read_users_me(
     """
     user = await get_current_user(token, db)
     return user
+
+
+async def get_current_token_data(token: str = Depends(oauth2_scheme)) -> TokenData:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, configs.SECRET_KEY, algorithms=[configs.ALGORITHM])
+        email: Optional[str] = payload.get("sub")
+        user_id: Optional[int] = payload.get("user_id")
+        role: Optional[int] = payload.get("role")
+
+        # Role should ideally always be present in new tokens.
+        # Role is crucial for authorization. If missing, token is considered invalid.
+        if role is None:
+            # Log this event: "Role missing in token for user_id: {user_id}"
+            raise credentials_exception # Role must be present
+
+        user_division_id: Optional[int] = payload.get("division_id")
+
+        if email is None or user_id is None: # Role is now checked for None above
+            raise credentials_exception
+
+        return TokenData(email=email, user_id=user_id, role=role, division_id=user_division_id)
+    except JWTError:
+        raise credentials_exception

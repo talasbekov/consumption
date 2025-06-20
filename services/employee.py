@@ -9,21 +9,24 @@ from schemas import (
     EmployeeCreate,
     EmployeeUpdate, StatusUpdate,
 )
-from schemas.employee_status import ( # Added imports
+from schemas.employee_status import (
     EmployeeStatusCreate,
     EmployeeStatusRead,
-    BulkStatusUpdateRequestSchema, # New schema
-    BulkStatusUpdateResponseSchema # New schema
+    BulkStatusUpdateRequestSchema,
+    BulkStatusUpdateResponseSchema
 )
+from schemas.auth import TokenData # Added import
 
 from pathlib import Path
-from typing import List, Type
+from typing import List, Type, Optional # Added Optional
 
 from fastapi import UploadFile, HTTPException
 from PIL import Image, ImageOps
 from io import BytesIO
 
-from sqlalchemy.orm import Session, InstrumentedAttribute
+from sqlalchemy.orm import Session, InstrumentedAttribute, selectinload # Added selectinload
+from sqlalchemy import select # Added select for potential future use, though query API is used here
+from models.division import Division, DivisionTypeEnum # Added imports
 
 from services.base import ServiceBase
 from schemas import EmployeeDataBulkUpdate
@@ -505,5 +508,136 @@ class EmployeeService(ServiceBase[Employee, EmployeeCreate, EmployeeUpdate]):
             raise HTTPException(status_code=500, detail=f"Database commit error: {str(e)}")
 
         return response
+
+    def get_employees_by_scope(
+        self,
+        db: Session,
+        token_data: TokenData,
+        skip: int = 0,
+        limit: int = 200
+    ) -> List[Employee]:
+        if not token_data or not hasattr(token_data, 'role') or token_data.role is None:
+            return []
+
+        query = db.query(Employee).options(
+            selectinload(Employee.division), # Changed from .divisions to .division
+            selectinload(Employee.position),
+            selectinload(Employee.statuses).selectinload(EmployeeStatus.status)
+        )
+
+        if token_data.role == 1 or token_data.role == 4: # Read all organization or Full access
+            return query.offset(skip).limit(limit).all()
+
+        elif token_data.role == 2 or token_data.role == 3: # Read own department scope
+            if not token_data.division_id:
+                return []
+
+            user_division = db.query(Division).filter(Division.id == token_data.division_id).first()
+            if not user_division:
+                return []
+
+            department_node = None
+            current_node = user_division
+            for _ in range(5):
+                if not current_node: break
+                if current_node.division_type == DivisionTypeEnum.DEPARTMENT:
+                    department_node = current_node
+                    break
+                if not current_node.parent_division_id:
+                    if user_division.division_type == DivisionTypeEnum.DEPARTMENT:
+                       department_node = user_division
+                    break
+                current_node = db.query(Division).filter(Division.id == current_node.parent_division_id).first()
+
+            if not department_node:
+                # Fallback: if no department found, and user is not in a department,
+                # show only their directly assigned division's employees.
+                # Or, if policy is strict, return []. For now, let's use their own division.
+                # If user_division itself is a department, this logic works.
+                # If user_division is NOT a department and no department ancestor, this means they see their own division.
+                # This seems reasonable for roles 2 and 3 if they are, for example, head of a company-level unit.
+                # However, the prompt stated "Read own department". If strictly no department, then empty.
+                # Let's stick to strict: if no department context, they see nothing.
+                return []
+
+
+            department_and_children_ids = [department_node.id]
+            parents_to_check = [department_node.id]
+            for _ in range(5):
+                if not parents_to_check: break
+                children_q = db.query(Division.id).filter(Division.parent_division_id.in_(parents_to_check))
+                child_ids = [c_id for (c_id,) in children_q.all()]
+                if not child_ids:
+                    break
+                department_and_children_ids.extend(child_ids)
+                parents_to_check = child_ids
+
+            return query.filter(Employee.division_id.in_(department_and_children_ids)).offset(skip).limit(limit).all()
+
+        else:
+            return []
+
+    def get_employee_by_id_and_scope(
+        self,
+        db: Session,
+        employee_id: int,
+        token_data: TokenData
+    ) -> Optional[Employee]:
+        employee = db.query(Employee).options(
+            selectinload(Employee.division), # Changed from .divisions to .division
+            selectinload(Employee.position),
+            selectinload(Employee.statuses).selectinload(EmployeeStatus.status)
+        ).filter(Employee.id == employee_id).first()
+
+        if not employee:
+            return None
+
+        if not token_data or not hasattr(token_data, 'role') or token_data.role is None:
+            return None
+
+        if token_data.role == 1 or token_data.role == 4:
+            return employee
+
+        elif token_data.role == 2 or token_data.role == 3:
+            if not token_data.division_id or not employee.division_id: return None
+
+            employee_s_department_id = None
+            # current_node_emp_div = employee.division # Assuming employee.division is populated by selectinload
+            # For safety, query if not sure it's loaded or if it's just ID.
+            # The options(selectinload(Employee.division)) should load it.
+            current_node_emp_div = db.query(Division).filter(Division.id == employee.division_id).first()
+            if not current_node_emp_div: return None
+
+            for _ in range(5):
+                if not current_node_emp_div: break
+                if current_node_emp_div.division_type == DivisionTypeEnum.DEPARTMENT:
+                    employee_s_department_id = current_node_emp_div.id
+                    break
+                if not current_node_emp_div.parent_division_id:
+                    if current_node_emp_div.division_type == DivisionTypeEnum.DEPARTMENT:
+                        employee_s_department_id = current_node_emp_div.id
+                    break
+                current_node_emp_div = db.query(Division).filter(Division.id == current_node_emp_div.parent_division_id).first()
+
+            user_s_department_id = None
+            current_node_user_div = db.query(Division).filter(Division.id == token_data.division_id).first()
+            if not current_node_user_div: return None
+
+            for _ in range(5):
+                if not current_node_user_div: break
+                if current_node_user_div.division_type == DivisionTypeEnum.DEPARTMENT:
+                    user_s_department_id = current_node_user_div.id
+                    break
+                if not current_node_user_div.parent_division_id:
+                    if current_node_user_div.division_type == DivisionTypeEnum.DEPARTMENT:
+                        user_s_department_id = current_node_user_div.id
+                    break
+                current_node_user_div = db.query(Division).filter(Division.id == current_node_user_div.parent_division_id).first()
+
+            if employee_s_department_id and user_s_department_id and employee_s_department_id == user_s_department_id:
+                return employee
+            return None # Not in the same department scope
+        else:
+            return None
 
 employee_service = EmployeeService(Employee)

@@ -7,26 +7,41 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core import get_db
 from schemas import DivisionRead, DivisionUpdate, DivisionCreate
+from schemas.auth import TokenData
 from services import division_service
+from api.v1.auth import get_current_token_data
+from api.v1.dependencies import require_role # Added import
 
 router = APIRouter(prefix="/api/v1/divisions", tags=["Divisions"])
+# Note: The global router dependencies=[Depends(HTTPBearer())] from previous subtasks is missing here.
+# It should be added if it's a global requirement.
+# For now, applying dependency only to the specified endpoint.
 
 
 @router.get(
     "",
     response_model=List[DivisionRead],
-    summary="Get all Divisions",
+    summary="Get Divisions based on user role and assignment", # Updated summary
 )
-async def get_all(
+async def get_filtered_divisions( # Renamed function
     *,
     db: AsyncSession = Depends(get_db),
     skip: int = 0,
     limit: int = 100,
+    token_data: TokenData = Depends(get_current_token_data) # Added token data dependency
 ):
     """
-    Get all Divisions
+    Get Divisions.
+    - Admins (role 1, 4) get all divisions.
+    - Department/Management Heads (role 2, 3) get divisions within their department hierarchy.
     """
-    divisions = await division_service.get_multi(db, skip, limit)
+    divisions = await division_service.get_divisions_for_user(
+        db,
+        user_role=token_data.role,
+        user_assigned_division_id=token_data.division_id,
+        skip=skip,
+        limit=limit
+    )
     return divisions
 
 
@@ -35,6 +50,7 @@ async def get_all(
     status_code=status.HTTP_201_CREATED,
     response_model=DivisionRead,
     summary="Create Division",
+    dependencies=[Depends(require_role([4]))] # Added role dependency
 )
 async def create_division(
     *,

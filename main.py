@@ -11,7 +11,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.openapi.docs import get_swagger_ui_html
 from pydantic import ValidationError
 
-from api import router
+from api import router as main_api_router
+from api.v1 import secondment as secondment_api
+from api.v1 import report as report_api # Import the new report module
 from core import configs
 from services import get_current_user
 
@@ -38,7 +40,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(router)
+app.include_router(main_api_router)
+app.include_router(secondment_api.router)
+app.include_router(report_api.router) # Include new report router
 
 # if configs.SENTRY_ENABLED:
 #     sentry_sdk.init(dsn=configs.SENTRY_DSN, traces_sample_rate=1.0)

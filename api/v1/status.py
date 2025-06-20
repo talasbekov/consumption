@@ -8,7 +8,10 @@ from sqlalchemy.orm import Session
 from core import get_db
 
 from schemas import StatusRead, StatusUpdate, StatusCreate
-from services import status_service
+from schemas.employee_status import BulkStatusUpdateRequestSchema, BulkStatusUpdateResponseSchema
+from services import status_service, employee_service
+# Assuming TokenData and get_current_token_data are not directly needed here if dependency handles it
+from api.v1.dependencies import check_bulk_status_update_permissions # Import new dependency
 
 router = APIRouter(prefix="/statuses", tags=["Statuses"], dependencies=[Depends(HTTPBearer())])
 
@@ -114,3 +117,22 @@ async def delete(
     """
 
     status_service.remove(db, str(id))
+
+
+@router.post(
+    "/bulk",
+    response_model=BulkStatusUpdateResponseSchema,
+    summary="Bulk update employee statuses",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(check_bulk_status_update_permissions)] # Added dependency
+)
+def bulk_update_statuses_endpoint(
+    request_data: BulkStatusUpdateRequestSchema, # request_data is passed to the dependency by FastAPI
+    db: Session = Depends(get_db)
+    # token_data: TokenData = Depends(get_current_token_data) # No longer needed directly
+):
+    # This service method is synchronous
+    # The dependency check_bulk_status_update_permissions runs before this.
+    # request_data is automatically passed to the dependency by FastAPI due to matching name and type hint.
+    response = employee_service.bulk_update_employee_statuses(db=db, request_data=request_data)
+    return response

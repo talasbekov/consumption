@@ -14,9 +14,12 @@ from PIL import Image
 from core import get_db
 from models import Employee
 # from models import Employee
-from schemas import EmployeeRead, EmployeeUpdate, EmployeeCreate, StatusUpdate # StatusUpdate will be removed from this endpoint
-from schemas.employee_status import EmployeeStatusCreate, EmployeeStatusRead # Added imports
+from schemas import EmployeeRead, EmployeeUpdate, EmployeeCreate, StatusUpdate
+from schemas.employee_status import EmployeeStatusCreate, EmployeeStatusRead
+from schemas.auth import TokenData
 from services import employee_service
+from api.v1.dependencies import require_role, check_role3_self_management_editor, check_role3_create_in_self_management # Added new dependency
+from api.v1.auth import get_current_token_data
 
 router = APIRouter(prefix="/employees", tags=["Employees"], dependencies=[Depends(HTTPBearer())])
 
@@ -24,35 +27,42 @@ router = APIRouter(prefix="/employees", tags=["Employees"], dependencies=[Depend
 @router.get(
     "",
     response_model=List[EmployeeRead],
-    summary="Get all Employees",
+    summary="Get employees based on user's scope", # Updated summary
 )
-async def get_all(
+async def get_all( # Function name is fine, summary clarifies its new behavior
     *,
     db: Session = Depends(get_db),
     skip: int = 0,
     limit: int = 200,
+    token_data: TokenData = Depends(get_current_token_data) # Added token_data
 ):
     """
-    Get all Employees
-
+    Get Employees based on the calling user's role and division scope.
+    Admins (role 1, 4) get all. Department/Management heads (role 2, 3) get from their department.
     """
-
-    return employee_service.get_multi(db, skip, limit)
+    # Note: employee_service.get_employees_by_scope is synchronous.
+    # FastAPI will run it in a threadpool because the endpoint is async.
+    employees = employee_service.get_employees_by_scope(
+        db, token_data=token_data, skip=skip, limit=limit
+    )
+    return employees
 
 
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
     response_model=EmployeeRead,
-    summary="Create Position",
+    summary="Create Employee",
+    dependencies=[Depends(check_role3_create_in_self_management)] # Changed to specific dependency
 )
 async def create(
     *,
-    db: Session = Depends(get_db),
-    body: EmployeeCreate,
+    db: Session = Depends(get_db), # This will be passed to the dependency by FastAPI if it needs it
+    body: EmployeeCreate, # This will be passed to the dependency by FastAPI
+    # token_data: TokenData = Depends(get_current_token_data) # No longer needed directly if dependency handles it
 ):
     """
-    Create Employee
+    Create Employee. Access controlled by roles and management scope.
 
     - **name**: required
     """
@@ -63,35 +73,47 @@ async def create(
 @router.get(
     "/{id}/",
     response_model=EmployeeRead,
-    summary="Get Employee by id",
+    summary="Get Employee by id (scoped)", # Updated summary
 )
 async def get_by_id(
     *,
     db: Session = Depends(get_db),
-    id: str,
+    id: str, # Should be int if employee_id is int
+    token_data: TokenData = Depends(get_current_token_data) # Added token_data
 ):
     """
-    Get Employee by id
-
-    - **id**: UUID - required.
+    Get Employee by id, subject to user's scope.
+    Admins (role 1, 4) can get any. Others can only get if employee is in their department.
     """
+    try:
+        employee_id = int(id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid employee ID format.")
 
-    return employee_service.get_by_id(db, str(id))
+    # Note: employee_service.get_employee_by_id_and_scope is synchronous.
+    employee = employee_service.get_employee_by_id_and_scope(
+        db, employee_id=employee_id, token_data=token_data
+    )
+    if not employee:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found or not accessible.")
+    return employee
 
 
 @router.put(
     "/{id}/",
     response_model=EmployeeRead,
     summary="Update Employee",
+    dependencies=[Depends(check_role3_self_management_editor)] # Added specific dependency
 )
 async def update(
     *,
     db: Session = Depends(get_db),
-    id: str,
+    id: str, # Path param 'id' will be captured by FastApiPath('target_employee_id') in dependency
     body: EmployeeUpdate,
+    # token_data: TokenData = Depends(get_current_token_data) # No longer needed directly if dependency handles it
 ):
     """
-    Update Employee
+    Update Employee. Access controlled by roles and management scope.
 
     """
 
@@ -104,14 +126,18 @@ async def update(
     "/{id}/",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete Employee",
+    # Keep role 4 for general delete, or enhance check_role3_self_management_editor if role 3 can delete
+    # For this step, applying the new check, which means role 4 bypasses, role 3 is checked.
+    dependencies=[Depends(check_role3_self_management_editor)]
 )
 async def delete(
     *,
     db: Session = Depends(get_db),
-    id: str,
+    id: str, # Path param 'id' will be captured by FastApiPath('target_employee_id') in dependency
+    # token_data: TokenData = Depends(get_current_token_data) # No longer needed
 ):
     """
-    Delete Employee
+    Delete Employee. Access controlled by roles and management scope.
 
     - **id**: UUId - required
     """
@@ -119,23 +145,8 @@ async def delete(
     employee_service.remove(db, str(id))
 
 
-@router.get(
-    "",
-    response_model=List[EmployeeRead],
-    summary="Get all Employees",
-)
-async def get_all_employee_by_state(
-    *,
-    db: Session = Depends(get_db),
-    skip: int = 0,
-    limit: int = 100,
-):
-    """
-    Get all Employees
-    """
-
-    return employee_service.get_multi(db, skip, limit)
-
+# Removed duplicate GET /employees endpoint (get_all_employee_by_state)
+# The first one named "get_all" is kept.
 
 # Эндпоинт для загрузки Excel файла
 @router.post("/upload-excel/")
