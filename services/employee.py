@@ -3,11 +3,18 @@ from datetime import date
 
 from models import (
     Employee, Status
-)  # Предполагается, что у вас есть модель Employee в models.py
+)
+from models.employee_status import EmployeeStatus # Added import
 from schemas import (
     EmployeeCreate,
     EmployeeUpdate, StatusUpdate,
-)  # Предполагается, что у вас есть схемы создания и обновления событий
+)
+from schemas.employee_status import ( # Added imports
+    EmployeeStatusCreate,
+    EmployeeStatusRead,
+    BulkStatusUpdateRequestSchema, # New schema
+    BulkStatusUpdateResponseSchema # New schema
+)
 
 from pathlib import Path
 from typing import List, Type
@@ -336,42 +343,79 @@ class EmployeeService(ServiceBase[Employee, EmployeeCreate, EmployeeUpdate]):
     #             # Освобождаем ресурсы, если это необходимо
     #             image.close()
 
-    async def assign_new_status(self, db: Session, employee_id: int, new_status_data: StatusUpdate):
+    # DEPRECATED: This method directly manipulated Status and employee.statuses.
+    # The new method assign_employee_status uses the EmployeeStatus association table.
+    # async def assign_new_status(self, db: Session, employee_id: int, new_status_data: StatusUpdate):
+    #     """
+    #     Присваивает новый статус сотруднику.
+    #     """
+    #     try:
+    #         employee = db.query(Employee).filter(Employee.id == employee_id).first()
+    #         if not employee:
+    #             raise HTTPException(status_code=404, detail="Employee not found")
+    #
+    #         # Создаем новый статус
+    #         new_status = Status(
+    #             id=new_status_data.id,
+    #             note=new_status_data.note,
+    #             start_date=new_status_data.start_date,
+    #             end_date=new_status_data.end_date
+    #         )
+    #         db.add(new_status)
+    #
+    #         # Привязываем статус к сотруднику
+    #         employee.statuses.append(new_status)
+    #
+    #         # Устанавливаем задачу для возврата в "в строю"
+    #         if new_status.end_date:
+    #             in_service_status = db.query(Status).filter(Status.nameRU == "в строю").first()
+    #             if not in_service_status:
+    #                 raise Exception("Status 'в строю' not found in the database")
+    #             db.commit()
+    #             # schedule_reset_status_to_in_service(employee_id, new_status.end_date, db)
+    #         else:
+    #             db.commit()
+    #
+    #         logging.info(f"New status assigned to employee {employee_id}")
+    #     except Exception as e:
+    #         logging.error(f"Error assigning new status: {e}")
+    #         db.rollback()
+    #         raise
+
+    def assign_employee_status(
+        self,
+        db: Session,
+        data: EmployeeStatusCreate
+    ) -> EmployeeStatusRead:
         """
-        Присваивает новый статус сотруднику.
+        Assigns a status to an employee by creating an EmployeeStatus record.
         """
-        try:
-            employee = db.query(Employee).filter(Employee.id == employee_id).first()
-            if not employee:
-                raise HTTPException(status_code=404, detail="Employee not found")
+        employee = db.query(Employee).filter(Employee.id == data.employee_id).first()
+        if not employee:
+            raise HTTPException(status_code=404, detail=f"Employee with id {data.employee_id} not found")
 
-            # Создаем новый статус
-            new_status = Status(
-                id=new_status_data.id,
-                note=new_status_data.note,
-                start_date=new_status_data.start_date,
-                end_date=new_status_data.end_date
-            )
-            db.add(new_status)
+        status_type = db.query(Status).filter(Status.id == data.status_id).first()
+        if not status_type:
+            raise HTTPException(status_code=404, detail=f"Status type with id {data.status_id} not found")
 
-            # Привязываем статус к сотруднику
-            employee.statuses.append(new_status)
+        db_employee_status = EmployeeStatus(
+            employee_id=data.employee_id,
+            status_id=data.status_id,
+            start_date=data.start_date,
+            end_date=data.end_date,
+            note=data.note
+        )
+        db.add(db_employee_status)
+        db.commit()
+        db.refresh(db_employee_status)
 
-            # Устанавливаем задачу для возврата в "в строю"
-            if new_status.end_date:
-                in_service_status = db.query(Status).filter(Status.nameRU == "в строю").first()
-                if not in_service_status:
-                    raise Exception("Status 'в строю' not found in the database")
-                db.commit()
-                # schedule_reset_status_to_in_service(employee_id, new_status.end_date, db)
-            else:
-                db.commit()
-
-            logging.info(f"New status assigned to employee {employee_id}")
-        except Exception as e:
-            logging.error(f"Error assigning new status: {e}")
-            db.rollback()
-            raise
+        # To ensure EmployeeStatusRead.from_orm works correctly, especially with nested models like 'status',
+        # relationships should be configured for eager loading if not already, or refresh specific attributes.
+        # For example, if 'status' is a relationship in EmployeeStatus model:
+        # from sqlalchemy.orm import selectinload
+        # db_employee_status = db.query(EmployeeStatus).options(selectinload(EmployeeStatus.status)).filter(EmployeeStatus.id == db_employee_status.id).one()
+        # For now, we assume basic from_orm conversion works.
+        return EmployeeStatusRead.from_orm(db_employee_status)
 
     async def update_employees_statuses(self, db: Session):
         """
@@ -415,5 +459,51 @@ class EmployeeService(ServiceBase[Employee, EmployeeCreate, EmployeeUpdate]):
             db.rollback()
             raise
 
+    def bulk_update_employee_statuses(
+        self,
+        db: Session,
+        request_data: BulkStatusUpdateRequestSchema
+    ) -> BulkStatusUpdateResponseSchema:
+        response = BulkStatusUpdateResponseSchema()
+        for item in request_data.items:
+            employee = db.query(Employee).filter(Employee.id == item.employee_id).first()
+            if not employee:
+                response.skipped += 1
+                response.errors.append(f"Employee with id {item.employee_id} not found.")
+                continue
+
+            status_type = db.query(Status).filter(Status.code == item.status).first() # Query by new 'code' field
+            if not status_type:
+                response.skipped += 1
+                response.errors.append(f"Status with code '{item.status}' not found.")
+                continue
+
+            # Simple creation of new status period.
+            # Add logic here if existing statuses for the same period need to be invalidated/updated.
+            # For now, we just create a new one as per the API spec for /statuses/bulk.
+            db_employee_status = EmployeeStatus(
+                employee_id=item.employee_id,
+                status_id=status_type.id,
+                start_date=request_data.date_from,
+                end_date=request_data.date_to,
+                note=request_data.comment
+            )
+            db.add(db_employee_status)
+            response.updated += 1
+
+        try:
+            db.commit()
+            # Refresh objects if their updated state is needed, but for counts, it's not strictly necessary.
+        except Exception as e:
+            db.rollback()
+            # If commit fails, all are essentially skipped from the DB perspective
+            # You might want to log the exception 'e' here.
+            logging.error(f"Database commit error during bulk status update: {str(e)}")
+            # For simplicity, the response might not reflect this partial failure accurately unless handled carefully.
+            # Consider how to report commit failures. For now, assume commit works or errors out broadly.
+            # Re-raise as HTTPException or handle as per application's error strategy
+            raise HTTPException(status_code=500, detail=f"Database commit error: {str(e)}")
+
+        return response
 
 employee_service = EmployeeService(Employee)

@@ -22,3 +22,22 @@ class EmployeeStatusRead(EmployeeStatusBase):
 
     class Config:
         orm_mode = True
+
+# Schemas for bulk status updates
+from pydantic import BaseModel
+from typing import List
+
+class BulkStatusUpdateItemSchema(BaseModel):
+    employee_id: int
+    status: str  # e.g., "ON_DUTY" (corresponds to Status.code)
+
+class BulkStatusUpdateRequestSchema(BaseModel):
+    date_from: date
+    date_to: Optional[date] = None
+    comment: Optional[str] = None
+    items: List[BulkStatusUpdateItemSchema]
+
+class BulkStatusUpdateResponseSchema(BaseModel):
+    updated: int = 0
+    skipped: int = 0
+    errors: List[str] = []

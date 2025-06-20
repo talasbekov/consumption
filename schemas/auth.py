@@ -14,6 +14,9 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     email: Optional[str] = None
+    role: Optional[int] = None
+    division_id: Optional[int] = None
+    user_id: Optional[int] = None
 
 
 class UserRead(BaseModel):

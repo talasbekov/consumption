@@ -76,12 +76,18 @@ async def get_current_user(token: str, db: AsyncSession) -> User:
     try:
         payload = jwt.decode(token, configs.SECRET_KEY, algorithms=[configs.ALGORITHM])
         email: str = payload.get("sub")
-        if email is None:
+        user_id: Optional[int] = payload.get("user_id")
+        role: Optional[int] = payload.get("role")
+        division_id: Optional[int] = payload.get("division_id")
+
+        if email is None or user_id is None: # Check user_id as well
             raise credentials_exception
-        token_data = TokenData(email=email)
+        token_data = TokenData(email=email, user_id=user_id, role=role, division_id=division_id)
     except JWTError:
         raise credentials_exception
 
+    # User lookup can remain by email, or switch to user_id: await db.get(User, token_data.user_id)
+    # For now, keeping email lookup as per subtask instructions.
     user = await get_user_by_email(db, token_data.email)
     if user is None:
         raise credentials_exception

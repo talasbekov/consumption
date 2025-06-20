@@ -12,6 +12,7 @@ class User(Model):
     password = Column(String(255), nullable=True)
     last_signed_at = Column(TIMESTAMP(timezone=True), nullable=True)
     login_count = Column(Integer, default=0)
+    role = Column(Integer, nullable=True)  # Added role column
 
     employee_id = Column(Integer, ForeignKey("employees.id"), nullable=True, index=True)
 
